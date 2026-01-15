@@ -9,7 +9,8 @@ export const GRID_SIZE = 20;
 
 // ============ 차량 설정 ============
 export const VEHICLE_SIZE = 6;
-export const LANE_OFFSET = 5;
+export const VEHICLE_SPEED = 1.5; // 차량 속도 (동일)
+export const LANE_OFFSET = 8; // 차선 오프셋 (도로 중앙에서 떨어진 거리)
 export const MAX_VEHICLES = 10;
 export const VEHICLE_SPAWN_INTERVAL = 3000;
 

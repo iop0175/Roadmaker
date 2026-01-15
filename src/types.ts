@@ -42,6 +42,8 @@ export interface Vehicle {
   toBuilding: string;
   status: VehicleStatus;
   officeArrivalTime: number;
+  /** 교차점별 진입 시간 기록 (FIFO용) */
+  intersectionArrivalTimes: Record<string, number>;
 }
 
 /** 교차점 */
