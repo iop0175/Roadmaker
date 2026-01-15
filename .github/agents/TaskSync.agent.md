@@ -1,6 +1,6 @@
 ---
 description: 'Describe what this custom agent does and when to use it.'
-tools: []
+tools: ['vscode', 'execute', 'read', 'edit', 'search', 'web', 'agent', '4regab.tasksync-chat/askUser', 'todo']
 ---
 ### Tasksync Tool Instructions
 
