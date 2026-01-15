@@ -6,6 +6,7 @@
 export interface Point {
   x: number;
   y: number;
+  speedMultiplier?: number; // 이동 속도 배율
 }
 
 /** 도로 (직선 또는 베지어 곡선) */
@@ -14,6 +15,8 @@ export interface Road {
   start: Point;
   end: Point;
   controlPoint?: Point; // 베지어 곡선 컨트롤 포인트
+  isBridge?: boolean; // 다리 여부
+  type?: 'normal' | 'highway'; // 도로 타입
 }
 
 /** 건물 (집 또는 회사) */
@@ -22,6 +25,8 @@ export interface Building {
   position: Point;
   color: string;
   name: string;
+  lastActiveTime: number; // 마지막 활동 시간 (차량 생성/도착/보유)
+  createdAt: number; // 생성 시간
 }
 
 /** 차량 상태 */

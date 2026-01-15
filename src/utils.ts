@@ -14,6 +14,7 @@ import {
   BUILDING_COLORS,
   ROAD_OVERLAP_THRESHOLD,
   ROAD_OVERLAP_RATIO,
+  LANE_OFFSET,
 } from './constants';
 
 // ============ 수학 유틸리티 ============
@@ -41,6 +42,19 @@ export function shadeColor(color: string, percent: number): string {
   return `#${(0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)}`;
 }
 
+/** 차선 오프셋 계산 */
+export function getLaneOffset(from: Point, to: Point, lane: 'left' | 'right'): Point {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (length === 0) return { x: 0, y: 0 };
+  const perpX = -dy / length;
+  const perpY = dx / length;
+  // LANE_OFFSET은 constants에서 import 필요
+  const offset = lane === 'right' ? LANE_OFFSET : -LANE_OFFSET;
+  return { x: perpX * offset, y: perpY * offset };
+}
+
 // ============ 베지어 곡선 유틸리티 ============
 
 /** 베지어 곡선 위의 점 샘플링 */
@@ -59,6 +73,43 @@ export function sampleBezierCurve(
     });
   }
   return points;
+}
+
+/** 경로 부드럽게 만들기 (곡선 도로 보간 및 속도 정보 포함) */
+export function interpolatePath(path: Point[], roads: Road[]): Point[] {
+  if (path.length < 2) return path;
+  
+  // 첫 포인트 초기화
+  const newPath: Point[] = [{ ...path[0], speedMultiplier: 1.0 }];
+  
+  for (let i = 0; i < path.length - 1; i++) {
+    const p1 = path[i];
+    const p2 = path[i+1];
+    
+    // 두 점을 연결하는 도로 찾기
+    const road = roads.find(r => 
+      (distance(r.start, p1) < 5 && distance(r.end, p2) < 5) ||
+      (distance(r.start, p2) < 5 && distance(r.end, p1) < 5)
+    );
+    
+    const speed = road?.type === 'highway' ? 1.5 : 1.0;
+
+    // 곡선 도로인 경우 샘플링
+    if (road && road.controlPoint) {
+      const d = distance(p1, p2);
+      const segments = Math.max(10, Math.floor(d / 10)); // 10px 단위로 샘플링
+      
+      const points = sampleBezierCurve(p1, road.controlPoint, p2, segments);
+      // 첫 점은 이미 포함되어 있으므로 제외하고 추가
+      for (let j = 1; j < points.length; j++) {
+        newPath.push({ ...points[j], speedMultiplier: speed });
+      }
+    } else {
+      // 직선인 경우 그냥 다음 점 추가
+      newPath.push({ ...p2, speedMultiplier: speed });
+    }
+  }
+  return newPath;
 }
 
 // ============ 강 생성 유틸리티 ============
@@ -81,24 +132,22 @@ function catmullRomSpline(
   };
 }
 
-/** 랜덤 강 생성 (부드러운 곡선) */
-export function generateRandomRiver(): RiverSegment[] {
+/** 랜덤 강 생성 (부드러운 곡선) - 맵 크기 반영 */
+export function generateRandomRiver(width: number = CANVAS_WIDTH, height: number = CANVAS_HEIGHT): RiverSegment[] {
   const direction = Math.floor(Math.random() * 3);
   
-  // 먼저 컨트롤 포인트 생성
   const controlPoints: { x: number; y: number; width: number }[] = [];
   
   if (direction === 0) {
-    // 수평 강 (왼쪽에서 오른쪽)
-    const baseY = 150 + Math.random() * 300;
+    // 수평 강
+    const baseY = height * 0.25 + Math.random() * (height * 0.5);
     let currentY = baseY;
     
-    // 4~6개의 컨트롤 포인트
     const numPoints = 4 + Math.floor(Math.random() * 3);
     for (let i = 0; i <= numPoints; i++) {
-      const x = (i / numPoints) * CANVAS_WIDTH;
+      const x = (i / numPoints) * width;
       currentY += (Math.random() - 0.5) * 80;
-      currentY = Math.max(80, Math.min(CANVAS_HEIGHT - 80, currentY));
+      currentY = Math.max(80, Math.min(height - 80, currentY));
       controlPoints.push({ 
         x, 
         y: currentY, 
@@ -106,15 +155,15 @@ export function generateRandomRiver(): RiverSegment[] {
       });
     }
   } else if (direction === 1) {
-    // 수직 강 (위에서 아래)
-    const baseX = 200 + Math.random() * 400;
+    // 수직 강
+    const baseX = width * 0.25 + Math.random() * (width * 0.5);
     let currentX = baseX;
     
     const numPoints = 4 + Math.floor(Math.random() * 3);
     for (let i = 0; i <= numPoints; i++) {
-      const y = (i / numPoints) * CANVAS_HEIGHT;
+      const y = (i / numPoints) * height;
       currentX += (Math.random() - 0.5) * 80;
-      currentX = Math.max(80, Math.min(CANVAS_WIDTH - 80, currentX));
+      currentX = Math.max(80, Math.min(width - 80, currentX));
       controlPoints.push({ 
         x: currentX, 
         y, 
@@ -122,32 +171,28 @@ export function generateRandomRiver(): RiverSegment[] {
       });
     }
   } else {
-    // 대각선 강 (S자 곡선)
+    // 대각선 강
     const startTop = Math.random() > 0.5;
     const numPoints = 5 + Math.floor(Math.random() * 3);
     
     for (let i = 0; i <= numPoints; i++) {
       const t = i / numPoints;
-      let x = t * CANVAS_WIDTH;
+      let x = t * width;
       let y: number;
       
       if (startTop) {
-        // 왼쪽 위에서 오른쪽 아래로
-        y = 50 + t * (CANVAS_HEIGHT - 100);
-        // S자 곡선 효과
+        y = 50 + t * (height - 100);
         y += Math.sin(t * Math.PI * 2) * 80;
       } else {
-        // 왼쪽 아래에서 오른쪽 위로
-        y = CANVAS_HEIGHT - 50 - t * (CANVAS_HEIGHT - 100);
+        y = height - 50 - t * (height - 100);
         y += Math.sin(t * Math.PI * 2) * 80;
       }
       
-      // 랜덤 변동 추가
       x += (Math.random() - 0.5) * 40;
       y += (Math.random() - 0.5) * 40;
       
-      x = Math.max(0, Math.min(CANVAS_WIDTH, x));
-      y = Math.max(50, Math.min(CANVAS_HEIGHT - 50, y));
+      x = Math.max(0, Math.min(width, x));
+      y = Math.max(50, Math.min(height - 50, y));
       
       controlPoints.push({ 
         x, 
@@ -157,18 +202,16 @@ export function generateRandomRiver(): RiverSegment[] {
     }
   }
   
-  // 컨트롤 포인트가 부족하면 기본값
   if (controlPoints.length < 3) {
     return [
-      { x: 0, y: 300, width: 50 }, 
-      { x: CANVAS_WIDTH / 2, y: 320, width: 55 },
-      { x: CANVAS_WIDTH, y: 280, width: 50 }
+      { x: 0, y: height/2, width: 50 }, 
+      { x: width/2, y: height/2 + 20, width: 55 },
+      { x: width, y: height/2 - 20, width: 50 }
     ];
   }
   
-  // Catmull-Rom 스플라인으로 부드러운 곡선 생성
   const segments: RiverSegment[] = [];
-  const samplesPerSegment = 5; // 각 컨트롤 포인트 사이의 샘플 수
+  const samplesPerSegment = 5; 
   
   for (let i = 0; i < controlPoints.length - 1; i++) {
     const p0 = controlPoints[Math.max(0, i - 1)];
@@ -179,13 +222,12 @@ export function generateRandomRiver(): RiverSegment[] {
     for (let j = 0; j < samplesPerSegment; j++) {
       const t = j / samplesPerSegment;
       const point = catmullRomSpline(p0, p1, p2, p3, t);
-      const width = p1.width + (p2.width - p1.width) * t;
+      const widthSeg = p1.width + (p2.width - p1.width) * t;
       
-      segments.push({ x: point.x, y: point.y, width });
+      segments.push({ x: point.x, y: point.y, width: widthSeg });
     }
   }
   
-  // 마지막 포인트 추가
   const last = controlPoints[controlPoints.length - 1];
   segments.push({ x: last.x, y: last.y, width: last.width });
   
@@ -231,58 +273,199 @@ export function isPointInRiverStatic(point: Point, riverSegments: RiverSegment[]
   return false;
 }
 
+/** 점과 도로 사이의 거리 체크 */
+function isTooCloseToRoads(point: Point, roads: Road[], minDistance: number): boolean {
+  if (roads.length === 0) return false;
+
+  for (const road of roads) {
+    // 1. 끝점과의 거리
+    if (distance(point, road.start) < minDistance) return true;
+    if (distance(point, road.end) < minDistance) return true;
+
+    // 2. 도로 선분/곡선과의 거리
+    const steps = road.controlPoint ? 10 : 5;
+    for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        let rx, ry;
+        if (road.controlPoint) {
+             rx = (1 - t) * (1 - t) * road.start.x + 2 * (1 - t) * t * road.controlPoint.x + t * t * road.end.x;
+             ry = (1 - t) * (1 - t) * road.start.y + 2 * (1 - t) * t * road.controlPoint.y + t * t * road.end.y;
+        } else {
+             rx = road.start.x + (road.end.x - road.start.x) * t;
+             ry = road.start.y + (road.end.y - road.start.y) * t;
+        }
+        
+        if (distance(point, { x: rx, y: ry }) < minDistance) return true;
+    }
+  }
+  return false;
+}
+
 // ============ 건물 생성 유틸리티 ============
 
-/** 랜덤 건물 배치 (강을 피해서) */
-export function generateRandomBuildings(riverSegments: RiverSegment[]): Building[] {
+/** 단일 집 생성 - 맵 크기 반영 */
+export function generateHome(
+  index: number,
+  existingBuildings: Building[],
+  riverSegments: RiverSegment[],
+  width: number = CANVAS_WIDTH,
+  height: number = CANVAS_HEIGHT,
+  roads: Road[] = []
+): Building {
+  const color = BUILDING_COLORS[index % BUILDING_COLORS.length];
+  let homePos: Point | null = null;
+  let attempts = 0;
+
+  // 집 위치 찾기
+  while (!homePos && attempts < 2000) {
+    const x = BUILDING_MARGIN + Math.random() * (width - BUILDING_MARGIN * 2);
+    const y = BUILDING_MARGIN + Math.random() * (height - BUILDING_MARGIN * 2);
+    const point = { x, y };
+
+    const isOverlapping = existingBuildings.some(b => distance(b.position, point) < MIN_BUILDING_DISTANCE);
+    
+    if (!isPointInRiverStatic(point, riverSegments) && 
+        !isOverlapping && 
+        !isTooCloseToRoads(point, roads, 50)) {
+      homePos = point;
+    }
+    attempts++;
+  }
+
+  // 실패 시 강제로 겹치지 않는 위치 찾기 (격자 탐색)
+  if (!homePos) {
+     // 최후의 수단: 맵 전체 그리드 스캔
+     for(let x=BUILDING_MARGIN; x<width-BUILDING_MARGIN; x+=50) {
+        for(let y=BUILDING_MARGIN; y<height-BUILDING_MARGIN; y+=50) {
+            const point = {x, y};
+            const isOverlapping = existingBuildings.some(b => distance(b.position, point) < MIN_BUILDING_DISTANCE);
+             if (!isPointInRiverStatic(point, riverSegments) && 
+                 !isOverlapping && 
+                 !isTooCloseToRoads(point, roads, 50)) {
+                homePos = point;
+                break;
+             }
+        }
+        if(homePos) break;
+     }
+  }
+
+  // 그래도 없으면... 어쩔 수 없음 (드문 경우)
+  if (!homePos) {
+      homePos = { x: width/2, y: height/2 }; 
+  }
+  
+  const suffix = Date.now() + Math.floor(Math.random() * 1000);
+  const now = Date.now();
+  return { 
+    id: `color${index}-home-${suffix}`, 
+    position: homePos, 
+    color, 
+    name: '',
+    lastActiveTime: now,
+    createdAt: now
+  };
+}
+
+/** 단일 회사 생성 - 맵 크기 반영 */
+export function generateOffice(
+  index: number,
+  existingBuildings: Building[],
+  riverSegments: RiverSegment[],
+  width: number = CANVAS_WIDTH,
+  height: number = CANVAS_HEIGHT,
+  roads: Road[] = []
+): Building {
+  const color = BUILDING_COLORS[index % BUILDING_COLORS.length];
+  let officePos: Point | null = null;
+  let attempts = 0;
+
+  // 회사 위치 찾기
+  while (!officePos && attempts < 2000) {
+    const x = BUILDING_MARGIN + Math.random() * (width - BUILDING_MARGIN * 2);
+    const y = BUILDING_MARGIN + Math.random() * (height - BUILDING_MARGIN * 2);
+    const point = { x, y };
+    
+    const isOverlapping = existingBuildings.some(b => distance(b.position, point) < MIN_BUILDING_DISTANCE);
+    const tooCloseToAnyHome = existingBuildings
+      .filter(b => b.id.includes('home'))
+      .some(h => distance(h.position, point) < MIN_HOME_OFFICE_DISTANCE);
+
+    if (!isPointInRiverStatic(point, riverSegments) && 
+        !isOverlapping &&
+        !tooCloseToAnyHome &&
+        !isTooCloseToRoads(point, roads, 55)) {
+      officePos = point;
+    }
+    attempts++;
+  }
+
+  // 실패 시 격자 탐색
+  if (!officePos) {
+     for(let x=BUILDING_MARGIN; x<width-BUILDING_MARGIN; x+=50) {
+        for(let y=BUILDING_MARGIN; y<height-BUILDING_MARGIN; y+=50) {
+            const point = {x, y};
+            const isOverlapping = existingBuildings.some(b => distance(b.position, point) < MIN_BUILDING_DISTANCE);
+            if (!isPointInRiverStatic(point, riverSegments) && 
+                !isOverlapping && 
+                !isTooCloseToRoads(point, roads, 55)) {
+                officePos = point;
+                break;
+            }
+        }
+        if(officePos) break;
+     }
+  }
+
+  if (!officePos) {
+    officePos = { x: width - BUILDING_MARGIN - Math.random() * 100, y: height - BUILDING_MARGIN - Math.random() * 100 };
+  }
+
+  const suffix = Date.now() + Math.floor(Math.random() * 1000);
+  const now = Date.now();
+  return { 
+    id: `color${index}-office-${suffix}`, 
+    position: officePos, 
+    color, 
+    name: '',
+    lastActiveTime: now,
+    createdAt: now
+  };
+}
+
+/** 단일 건물 쌍 생성 (집 + 회사) - 맵 크기 반영 */
+export function generateBuildingPair(
+  index: number,
+  existingBuildings: Building[],
+  riverSegments: RiverSegment[],
+  width: number = CANVAS_WIDTH,
+  height: number = CANVAS_HEIGHT,
+  roads: Road[] = []
+): Building[] {
+  const home = generateHome(index, existingBuildings, riverSegments, width, height, roads);
+  const office = generateOffice(index, [...existingBuildings, home], riverSegments, width, height, roads);
+  
+  if (index < 5) {
+      home.id = `color${index}-home`;
+      office.id = `color${index}-office`;
+  }
+
+  return [home, office];
+}
+
+/** 랜덤 건물 배치 (강을 피해서, 맵 크기 반영) */
+export function generateRandomBuildings(
+  riverSegments: RiverSegment[], 
+  count: number = 3, 
+  width: number = CANVAS_WIDTH, 
+  height: number = CANVAS_HEIGHT,
+  roads: Road[] = []
+): Building[] {
   const buildings: Building[] = [];
   
-  for (let i = 0; i < 3; i++) {
-    const color = BUILDING_COLORS[i % BUILDING_COLORS.length];
-    let homePos: Point | null = null;
-    let officePos: Point | null = null;
-    let attempts = 0;
-    
-    // 집 위치 찾기
-    while (!homePos && attempts < 50) {
-      const x = BUILDING_MARGIN + Math.random() * (CANVAS_WIDTH - BUILDING_MARGIN * 2);
-      const y = BUILDING_MARGIN + Math.random() * (CANVAS_HEIGHT - BUILDING_MARGIN * 2);
-      const point = { x, y };
-      
-      if (!isPointInRiverStatic(point, riverSegments) && 
-          !buildings.some(b => distance(b.position, point) < MIN_BUILDING_DISTANCE)) {
-        homePos = point;
-      }
-      attempts++;
-    }
-    
-    if (!homePos) {
-      homePos = { x: BUILDING_MARGIN + i * 200, y: BUILDING_MARGIN };
-    }
-    
-    // 회사 위치 찾기
-    attempts = 0;
-    while (!officePos && attempts < 50) {
-      const x = BUILDING_MARGIN + Math.random() * (CANVAS_WIDTH - BUILDING_MARGIN * 2);
-      const y = BUILDING_MARGIN + Math.random() * (CANVAS_HEIGHT - BUILDING_MARGIN * 2);
-      const point = { x, y };
-      
-      if (distance(homePos, point) >= MIN_HOME_OFFICE_DISTANCE &&
-          !isPointInRiverStatic(point, riverSegments) &&
-          !buildings.some(b => distance(b.position, point) < MIN_BUILDING_DISTANCE)) {
-        officePos = point;
-      }
-      attempts++;
-    }
-    
-    if (!officePos) {
-      officePos = { x: CANVAS_WIDTH - BUILDING_MARGIN - i * 100, y: CANVAS_HEIGHT - BUILDING_MARGIN };
-    }
-    
-    buildings.push(
-      { id: `color${i}-home`, position: homePos, color, name: '' },
-      { id: `color${i}-office`, position: officePos, color, name: '' }
-    );
+  for (let i = 0; i < count; i++) {
+    const pair = generateBuildingPair(i, buildings, riverSegments, width, height, roads);
+    buildings.push(...pair);
   }
   
   return buildings;
