@@ -743,24 +743,24 @@ const RoadGame: React.FC = () => {
           />
           
           {/* 줌 컨트롤 */}
-          <div className="absolute bottom-3 right-3 flex flex-col gap-2 z-20">
+          <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-20">
             <button
               onClick={() => setZoom(prev => Math.min(3, prev + 0.25))}
-              className="w-10 h-10 rounded-lg bg-white/90 backdrop-blur shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-100 active:bg-slate-200 font-bold text-xl"
+              className="w-12 h-12 rounded-xl bg-white shadow-lg border-2 border-slate-300 flex items-center justify-center text-slate-700 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-600 active:bg-blue-100 font-bold text-2xl transition-all"
               title="Zoom In"
             >
               +
             </button>
-            <div className="text-center text-xs font-medium text-slate-600 bg-white/90 rounded px-1 py-0.5">
+            <div className="text-center text-sm font-bold text-white bg-slate-700 rounded-lg px-2 py-1 shadow-md">
               {Math.round(zoom * 100)}%
             </div>
             <button
               onClick={() => setZoom(prev => Math.max(1, prev - 0.25))}
               disabled={zoom <= 1}
-              className={`w-10 h-10 rounded-lg bg-white/90 backdrop-blur shadow-lg border border-slate-200 flex items-center justify-center font-bold text-xl ${
+              className={`w-12 h-12 rounded-xl bg-white shadow-lg border-2 flex items-center justify-center font-bold text-2xl transition-all ${
                 zoom <= 1 
-                  ? 'text-slate-300 cursor-not-allowed' 
-                  : 'text-slate-700 hover:bg-slate-100 active:bg-slate-200'
+                  ? 'border-slate-200 text-slate-300 cursor-not-allowed' 
+                  : 'border-slate-300 text-slate-700 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-600 active:bg-blue-100'
               }`}
               title="Zoom Out"
             >
