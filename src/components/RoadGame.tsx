@@ -9,7 +9,7 @@
  * - 차량이 집 → 회사 → 집 사이클 완료 시 점수 획득
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   VEHICLE_SIZE,
   MAX_VEHICLES_PER_HOME,
@@ -57,7 +57,14 @@ const getInitialZoom = (): number => {
 };
 
 const RoadGame: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // 캔버스 레이어: 정적(배경/강), 도로, 건물, 차량, UI
+  const staticCanvasRef = useRef<HTMLCanvasElement>(null);  // 배경, 강
+  const roadCanvasRef = useRef<HTMLCanvasElement>(null);    // 도로, 교차점
+  const buildingCanvasRef = useRef<HTMLCanvasElement>(null); // 건물
+  const vehicleCanvasRef = useRef<HTMLCanvasElement>(null); // 차량
+  const uiCanvasRef = useRef<HTMLCanvasElement>(null);      // UI (프리뷰, 선택)
+  const canvasRef = vehicleCanvasRef; // 기존 이벤트 핸들러 호환성
+  
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(getInitialZoom); // 모바일: 40%, 데스크톱: 75%
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 }); // 맵 이동 오프셋
@@ -494,25 +501,23 @@ const RoadGame: React.FC = () => {
     doesRoadIntersectAnyBuilding,
   } = useCollision(riverSegments, roads, buildings);
 
-  // 캔버스 렌더링
+  // 낮/밤 테마 색상 (useMemo로 캐싱)
+  const theme = useMemo(() => ({
+    background: isNightMode ? '#1a1a2e' : '#f5f5f4',
+    river: isNightMode ? '#1e3a5f' : '#7dd3fc',
+    road: isNightMode ? '#4a5568' : '#9ca3af',
+    roadStripe: isNightMode ? '#a0aec0' : '#ffffff',
+    text: isNightMode ? '#e2e8f0' : '#1f2937',
+    building: isNightMode ? 0.7 : 1.0,
+  }), [isNightMode]);
+
+  // ============ 정적 레이어 렌더링 (배경 + 강) ============
+  // riverSegments나 isNightMode가 변경될 때만 다시 렌더링
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas = staticCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    ctx.save();
-    // CSS transform으로 줌 처리하므로 캔버스 스케일은 1로 유지
-
-    // 낮/밤 테마 색상
-    const theme = {
-      background: isNightMode ? '#1a1a2e' : '#f5f5f4',
-      river: isNightMode ? '#1e3a5f' : '#7dd3fc',
-      road: isNightMode ? '#4a5568' : '#9ca3af',
-      roadStripe: isNightMode ? '#a0aec0' : '#ffffff',
-      text: isNightMode ? '#e2e8f0' : '#1f2937',
-      building: isNightMode ? 0.7 : 1.0, // 건물 색상 밝기
-    };
 
     // 배경
     ctx.fillStyle = theme.background;
@@ -520,7 +525,6 @@ const RoadGame: React.FC = () => {
 
     // 강 렌더링
     if (riverSegments.length > 0) {
-      // 강의 방향 감지 (수직 vs 수평)
       const firstSeg = riverSegments[0];
       const lastSeg = riverSegments[riverSegments.length - 1];
       const deltaX = Math.abs(lastSeg.x - firstSeg.x);
@@ -531,7 +535,6 @@ const RoadGame: React.FC = () => {
       ctx.beginPath();
       
       if (isVertical) {
-        // 수직 강: 좌우로 폭 적용
         ctx.moveTo(riverSegments[0].x - riverSegments[0].width / 2, riverSegments[0].y);
         for (let i = 1; i < riverSegments.length; i++) {
           ctx.lineTo(riverSegments[i].x - riverSegments[i].width / 2, riverSegments[i].y);
@@ -540,7 +543,6 @@ const RoadGame: React.FC = () => {
           ctx.lineTo(riverSegments[i].x + riverSegments[i].width / 2, riverSegments[i].y);
         }
       } else {
-        // 수평 강: 위아래로 폭 적용
         ctx.moveTo(riverSegments[0].x, riverSegments[0].y - riverSegments[0].width / 2);
         for (let i = 1; i < riverSegments.length; i++) {
           ctx.lineTo(riverSegments[i].x, riverSegments[i].y - riverSegments[i].width / 2);
@@ -582,6 +584,18 @@ const RoadGame: React.FC = () => {
       }
       ctx.stroke();
     }
+  }, [riverSegments, theme, mapSize]);
+
+  // ============ 도로 레이어 렌더링 (도로 + 교차점) ============
+  // roads나 intersections가 변경될 때만 다시 렌더링
+  useEffect(() => {
+    const canvas = roadCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 캔버스 클리어
+    ctx.clearRect(0, 0, mapSize.width, mapSize.height);
 
     // 도로 외곽선
     ctx.lineWidth = ROAD_OUTLINE_WIDTH;
@@ -602,13 +616,11 @@ const RoadGame: React.FC = () => {
     // 교차점 외곽선
     intersections.forEach(intersection => {
       if (intersection.isRoundabout) {
-        // 원형 교차로: 큰 외곽선 (진한 티얼)
         ctx.fillStyle = '#0d7377';
         ctx.beginPath();
         ctx.arc(intersection.point.x, intersection.point.y, 32, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        // 일반 교차로
         ctx.fillStyle = theme.road;
         ctx.beginPath();
         ctx.arc(intersection.point.x, intersection.point.y, 16, 0, Math.PI * 2);
@@ -634,26 +646,22 @@ const RoadGame: React.FC = () => {
     // 교차점 본체
     intersections.forEach(intersection => {
       if (intersection.isRoundabout) {
-        // 원형 교차로: 흰색 도로 링
         ctx.fillStyle = theme.roadStripe;
         ctx.beginPath();
         ctx.arc(intersection.point.x, intersection.point.y, 30, 0, Math.PI * 2);
         ctx.fill();
         
-        // 중앙 티얼 색상 섬
         ctx.fillStyle = '#14b8a6';
         ctx.beginPath();
         ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
         ctx.fill();
         
-        // 중앙 원 외곽선
         ctx.strokeStyle = '#0d9488';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
         ctx.stroke();
       } else {
-        // 일반 교차로
         ctx.fillStyle = theme.roadStripe;
         ctx.beginPath();
         ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
@@ -675,19 +683,9 @@ const RoadGame: React.FC = () => {
       ctx.stroke();
     });
 
-    // 교차점 혼잡도
-    const intersectionCounts = new Map<string, number>();
-    vehicles.forEach(v => {
-      Object.keys(v.intersectionArrivalTimes).forEach(key => {
-        intersectionCounts.set(key, (intersectionCounts.get(key) || 0) + 1);
-      });
-    });
-
-    // 교차점 중앙 표시
+    // 교차점 마커 및 저지선 (원형 교차로는 화살표만)
     intersections.forEach(intersection => {
-      // 원형 교차로는 별도 렌더링
       if (intersection.isRoundabout) {
-        // 회전 화살표 아이콘
         ctx.save();
         ctx.translate(intersection.point.x, intersection.point.y);
         
@@ -696,12 +694,10 @@ const RoadGame: React.FC = () => {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
-        // 원형 화살표
         ctx.beginPath();
         ctx.arc(0, 0, 8, -Math.PI * 0.7, Math.PI * 0.5);
         ctx.stroke();
         
-        // 화살표 머리
         const arrowAngle = Math.PI * 0.5;
         const arrowX = 8 * Math.cos(arrowAngle);
         const arrowY = 8 * Math.sin(arrowAngle);
@@ -712,149 +708,70 @@ const RoadGame: React.FC = () => {
         ctx.stroke();
         
         ctx.restore();
-        return; // 원형 교차로는 저지선 불필요
-      }
-      
-      const key = `${intersection.point.x},${intersection.point.y}`;
-      const count = intersectionCounts.get(key) || 0;
-      const isCongested = count >= 5;
-
-      ctx.fillStyle = isCongested ? '#ef4444' : '#fbbf24';
-      ctx.beginPath();
-      ctx.arc(intersection.point.x, intersection.point.y, isCongested ? 5 : 4, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.strokeStyle = isCongested ? '#fca5a5' : '#9ca3af';
-      ctx.lineWidth = isCongested ? 2 : 1;
-      ctx.beginPath();
-      ctx.arc(intersection.point.x, intersection.point.y, 12, 0, Math.PI * 2);
-      ctx.stroke();
-
-      if (isCongested) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px system-ui';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('!', intersection.point.x, intersection.point.y);
-      }
-      
-      // 저지선
-      roads.forEach(road => {
-        const atStart = distance(road.start, intersection.point) < 5;
-        const atEnd = distance(road.end, intersection.point) < 5;
+      } else {
+        // 일반 교차점 마커
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(intersection.point.x, intersection.point.y, 4, 0, Math.PI * 2);
+        ctx.fill();
         
-        if (atStart || atEnd) {
-          const roadStart = atStart ? road.start : road.end;
-          const roadEnd = atStart ? road.end : road.start;
-          const dx = roadEnd.x - roadStart.x;
-          const dy = roadEnd.y - roadStart.y;
-          const len = Math.sqrt(dx * dx + dy * dy);
-          if (len === 0) return;
+        ctx.strokeStyle = '#9ca3af';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(intersection.point.x, intersection.point.y, 12, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // 저지선
+        roads.forEach(road => {
+          const atStart = distance(road.start, intersection.point) < 5;
+          const atEnd = distance(road.end, intersection.point) < 5;
           
-          const nx = dx / len;
-          const ny = dy / len;
-          
-          const stopLineX = intersection.point.x + nx * 20;
-          const stopLineY = intersection.point.y + ny * 20;
-          
-          const perpX = -ny;
-          const perpY = nx;
-          
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.moveTo(stopLineX + perpX * 10, stopLineY + perpY * 10);
-          ctx.lineTo(stopLineX - perpX * 10, stopLineY - perpY * 10);
-          ctx.stroke();
-        }
-      });
+          if (atStart || atEnd) {
+            const roadStart = atStart ? road.start : road.end;
+            const roadEnd = atStart ? road.end : road.start;
+            const dx = roadEnd.x - roadStart.x;
+            const dy = roadEnd.y - roadStart.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            if (len === 0) return;
+            
+            const nx = dx / len;
+            const ny = dy / len;
+            
+            const stopLineX = intersection.point.x + nx * 20;
+            const stopLineY = intersection.point.y + ny * 20;
+            
+            const perpX = -ny;
+            const perpY = nx;
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(stopLineX + perpX * 10, stopLineY + perpY * 10);
+            ctx.lineTo(stopLineX - perpX * 10, stopLineY - perpY * 10);
+            ctx.stroke();
+          }
+        });
+      }
     });
+  }, [roads, intersections, theme, mapSize]);
 
-    // 선택된 도로 하이라이트
-    if (selectedRoad) {
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = '#06b6d4';
-      ctx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
-      ctx.lineWidth = ROAD_WIDTH + 8;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(selectedRoad.start.x, selectedRoad.start.y);
-      if (selectedRoad.controlPoint) {
-        ctx.quadraticCurveTo(selectedRoad.controlPoint.x, selectedRoad.controlPoint.y, selectedRoad.end.x, selectedRoad.end.y);
-      } else {
-        ctx.lineTo(selectedRoad.end.x, selectedRoad.end.y);
-      }
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    }
+  // ============ 동적 레이어 렌더링 (건물 + 차량 + UI) ============
+  // 매 프레임 렌더링
+  useEffect(() => {
+    const buildingCanvas = buildingCanvasRef.current;
+    const vehicleCanvas = vehicleCanvasRef.current;
+    if (!buildingCanvas || !vehicleCanvas) return;
+    const buildingCtx = buildingCanvas.getContext('2d');
+    const vehicleCtx = vehicleCanvas.getContext('2d');
+    if (!buildingCtx || !vehicleCtx) return;
 
-    // 도로 프리뷰
-    if (isDrawing && drawStart && currentEnd) {
-      const crossesRiver = controlPoint
-        ? doesCurveRoadCrossRiver(drawStart, currentEnd, controlPoint)
-        : doesRoadCrossRiver(drawStart, currentEnd);
-      const overlapsRoad = doRoadsOverlap(drawStart, currentEnd, roads, controlPoint || undefined);
-      const overlapsBuilding = doesRoadIntersectAnyBuilding(drawStart, currentEnd, controlPoint || undefined);
-      
-      const isInvalid = overlapsRoad || overlapsBuilding;
-      let previewColor = isInvalid ? 'rgba(239, 68, 68, 0.6)' : 'rgba(66, 133, 244, 0.5)';
-      
-      // 비용 계산
-      const dist = distance(drawStart, currentEnd);
-      let cost = Math.ceil(dist);
-      let isBridge = false;
-      
-      if (!isInvalid && crossesRiver) {
-        if (activeTool === 'bridge' && bridgeCount > 0) {
-          previewColor = 'rgba(210, 180, 140, 0.8)';
-          cost = 0;
-          isBridge = true;
-        } else {
-          previewColor = 'rgba(239, 68, 68, 0.6)';
-        }
-      }
+    // 건물 캔버스 클리어
+    buildingCtx.clearRect(0, 0, mapSize.width, mapSize.height);
+    // 차량/UI 캔버스 클리어
+    vehicleCtx.clearRect(0, 0, mapSize.width, mapSize.height);
 
-      ctx.strokeStyle = previewColor;
-      ctx.lineWidth = 22;
-      ctx.beginPath();
-      ctx.moveTo(drawStart.x, drawStart.y);
-      if (controlPoint) {
-        ctx.quadraticCurveTo(controlPoint.x, controlPoint.y, currentEnd.x, currentEnd.y);
-      } else {
-        ctx.lineTo(currentEnd.x, currentEnd.y);
-      }
-      ctx.stroke();
-
-      // 비용 표시
-      if (dist > 10) {
-        const midX = (drawStart.x + currentEnd.x) / 2;
-        const midY = (drawStart.y + currentEnd.y) / 2;
-        
-        // 배경
-        const costText = isBridge ? 'FREE' : `${cost}`;
-        ctx.font = 'bold 14px system-ui';
-        const textWidth = ctx.measureText(costText).width;
-        
-        ctx.fillStyle = isInvalid ? 'rgba(239, 68, 68, 0.9)' : (score >= cost ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)');
-        ctx.beginPath();
-        ctx.roundRect(midX - textWidth / 2 - 8, midY - 12, textWidth + 16, 24, 6);
-        ctx.fill();
-        
-        // 텍스트
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(costText, midX, midY);
-      }
-
-      if (controlPoint) {
-        ctx.fillStyle = 'rgba(66, 133, 244, 0.8)';
-        ctx.beginPath();
-        ctx.arc(controlPoint.x, controlPoint.y, 6, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+    const ctx = buildingCtx; // 건물 렌더링용
+    const now = Date.now();
 
     // 건물 렌더링
     buildings.forEach(building => {
@@ -1017,6 +934,160 @@ const RoadGame: React.FC = () => {
       }
     });
 
+    // === vehicleCtx에서 UI 요소 렌더링 ===
+    const uiCtx = vehicleCtx;
+    
+    // 교차점 혼잡도 표시
+    const intersectionCounts = new Map<string, number>();
+    vehicles.forEach(v => {
+      Object.keys(v.intersectionArrivalTimes).forEach(key => {
+        intersectionCounts.set(key, (intersectionCounts.get(key) || 0) + 1);
+      });
+    });
+
+    // 교차점 혼잡도 마커
+    intersections.forEach(intersection => {
+      if (intersection.isRoundabout) return; // 원형 교차로는 혼잡도 표시 안 함
+      
+      const key = `${intersection.point.x},${intersection.point.y}`;
+      const count = intersectionCounts.get(key) || 0;
+      const isCongested = count >= 5;
+
+      if (count > 0) {
+        uiCtx.fillStyle = isCongested ? '#ef4444' : '#fbbf24';
+        uiCtx.beginPath();
+        uiCtx.arc(intersection.point.x, intersection.point.y, isCongested ? 5 : 4, 0, Math.PI * 2);
+        uiCtx.fill();
+      }
+      
+      if (isCongested) {
+        uiCtx.strokeStyle = '#fca5a5';
+        uiCtx.lineWidth = 2;
+        uiCtx.beginPath();
+        uiCtx.arc(intersection.point.x, intersection.point.y, 12, 0, Math.PI * 2);
+        uiCtx.stroke();
+        
+        uiCtx.fillStyle = '#ffffff';
+        uiCtx.font = 'bold 10px system-ui';
+        uiCtx.textAlign = 'center';
+        uiCtx.textBaseline = 'middle';
+        uiCtx.fillText('!', intersection.point.x, intersection.point.y);
+      }
+    });
+
+    // 선택된 도로 하이라이트
+    if (selectedRoad) {
+      uiCtx.shadowBlur = 15;
+      uiCtx.shadowColor = '#06b6d4';
+      uiCtx.strokeStyle = 'rgba(34, 211, 238, 0.6)';
+      uiCtx.lineWidth = ROAD_WIDTH + 8;
+      uiCtx.lineCap = 'round';
+      uiCtx.lineJoin = 'round';
+      uiCtx.beginPath();
+      uiCtx.moveTo(selectedRoad.start.x, selectedRoad.start.y);
+      if (selectedRoad.controlPoint) {
+        uiCtx.quadraticCurveTo(selectedRoad.controlPoint.x, selectedRoad.controlPoint.y, selectedRoad.end.x, selectedRoad.end.y);
+      } else {
+        uiCtx.lineTo(selectedRoad.end.x, selectedRoad.end.y);
+      }
+      uiCtx.stroke();
+      uiCtx.shadowBlur = 0;
+    }
+
+    // 도로 프리뷰 (건설 중)
+    if (isDrawing && drawStart && currentEnd) {
+      const crossesRiver = controlPoint
+        ? doesCurveRoadCrossRiver(drawStart, currentEnd, controlPoint)
+        : doesRoadCrossRiver(drawStart, currentEnd);
+      const overlapsRoad = doRoadsOverlap(drawStart, currentEnd, roads, controlPoint || undefined);
+      const overlapsBuilding = doesRoadIntersectAnyBuilding(drawStart, currentEnd, controlPoint || undefined);
+      
+      const isInvalid = overlapsRoad || overlapsBuilding;
+      let previewColor = isInvalid ? 'rgba(239, 68, 68, 0.6)' : 'rgba(66, 133, 244, 0.5)';
+      
+      // 비용 계산
+      const dist = distance(drawStart, currentEnd);
+      let cost = Math.ceil(dist);
+      let isBridge = false;
+      let isOverpass = false;
+      
+      if (!isInvalid && crossesRiver) {
+        if (activeTool === 'bridge' && bridgeCount > 0) {
+          previewColor = 'rgba(210, 180, 140, 0.8)';
+          cost = 0;
+          isBridge = true;
+        } else if (activeTool !== 'overpass') {
+          previewColor = 'rgba(239, 68, 68, 0.6)';
+        }
+      }
+      
+      if (activeTool === 'overpass') {
+        previewColor = 'rgba(147, 51, 234, 0.6)'; // 보라색
+        cost = 0;
+        isOverpass = true;
+      }
+
+      // 고가차도는 자동 곡선 적용 (미리보기에도 적용)
+      let previewControlPoint = controlPoint;
+      if (activeTool === 'overpass' && !controlPoint) {
+        const midX = (drawStart.x + currentEnd.x) / 2;
+        const midY = (drawStart.y + currentEnd.y) / 2;
+        const dx = currentEnd.x - drawStart.x;
+        const dy = currentEnd.y - drawStart.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len >= 20) {
+          const curveOffset = len * 0.15;
+          const perpX = -dy / len;
+          const perpY = dx / len;
+          previewControlPoint = {
+            x: midX + perpX * curveOffset,
+            y: midY + perpY * curveOffset
+          };
+        }
+      }
+
+      uiCtx.strokeStyle = previewColor;
+      uiCtx.lineWidth = 22;
+      uiCtx.lineCap = 'round';
+      uiCtx.beginPath();
+      uiCtx.moveTo(drawStart.x, drawStart.y);
+      if (previewControlPoint) {
+        uiCtx.quadraticCurveTo(previewControlPoint.x, previewControlPoint.y, currentEnd.x, currentEnd.y);
+      } else {
+        uiCtx.lineTo(currentEnd.x, currentEnd.y);
+      }
+      uiCtx.stroke();
+
+      // 비용 표시
+      if (dist > 10) {
+        const midX = (drawStart.x + currentEnd.x) / 2;
+        const midY = (drawStart.y + currentEnd.y) / 2;
+        
+        // 배경
+        const costText = isBridge || isOverpass ? 'FREE' : `${cost}`;
+        uiCtx.font = 'bold 14px system-ui';
+        const textWidth = uiCtx.measureText(costText).width;
+        
+        uiCtx.fillStyle = isInvalid ? 'rgba(239, 68, 68, 0.9)' : (score >= cost ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)');
+        uiCtx.beginPath();
+        uiCtx.roundRect(midX - textWidth / 2 - 8, midY - 12, textWidth + 16, 24, 6);
+        uiCtx.fill();
+        
+        // 텍스트
+        uiCtx.fillStyle = '#ffffff';
+        uiCtx.textAlign = 'center';
+        uiCtx.textBaseline = 'middle';
+        uiCtx.fillText(costText, midX, midY);
+      }
+
+      if (previewControlPoint) {
+        uiCtx.fillStyle = 'rgba(66, 133, 244, 0.8)';
+        uiCtx.beginPath();
+        uiCtx.arc(previewControlPoint.x, previewControlPoint.y, 6, 0, Math.PI * 2);
+        uiCtx.fill();
+      }
+    }
+
     // 선택된 건물 하이라이트 (주황색 건물 모양)
     // 차량 렌더링 이후, 밤 모드 이후에 그려서 가장 위에 표시
 
@@ -1101,9 +1172,10 @@ const RoadGame: React.FC = () => {
     ctx.restore();
 
   }, [
-    roads, vehicles, isDrawing, drawStart, currentEnd, controlPoint, 
-    intersections, riverSegments, buildings, doesRoadCrossRiver, doesCurveRoadCrossRiver,
-    doesRoadIntersectAnyBuilding, mapSize, zoom, selectedRoad, bridgeCount, isNightMode, selectedBuilding
+    vehicles, isDrawing, drawStart, currentEnd, controlPoint, 
+    intersections, buildings, doesRoadCrossRiver, doesCurveRoadCrossRiver,
+    doesRoadIntersectAnyBuilding, mapSize, selectedRoad, bridgeCount, isNightMode, selectedBuilding,
+    roads, activeTool, score, theme
   ]);
 
   return (
@@ -1152,7 +1224,6 @@ const RoadGame: React.FC = () => {
       {/* 세로 모드 헤더 */}
       <div className="landscape-hide w-full flex justify-center px-2 shrink-0">
         <Header
-          isBuildMode={isBuildMode}
           score={score}
           gameTime={gameTime}
           destroyedCount={destroyedCount}
@@ -1197,8 +1268,45 @@ const RoadGame: React.FC = () => {
             cursor: activeTool === 'pan' ? 'grab' : 'default',
           }}
         >
+          {/* 정적 레이어 (배경, 강) */}
           <canvas
-            ref={canvasRef}
+            ref={staticCanvasRef}
+            width={mapSize.width}
+            height={mapSize.height}
+            className="absolute top-0 left-0 pointer-events-none"
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            }}
+          />
+          {/* 도로 레이어 */}
+          <canvas
+            ref={roadCanvasRef}
+            width={mapSize.width}
+            height={mapSize.height}
+            className="absolute top-0 left-0 pointer-events-none"
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            }}
+          />
+          {/* 건물 레이어 */}
+          <canvas
+            ref={buildingCanvasRef}
+            width={mapSize.width}
+            height={mapSize.height}
+            className="absolute top-0 left-0 pointer-events-none"
+            style={{ 
+              width: '100%', 
+              height: '100%',
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            }}
+          />
+          {/* 차량/UI 레이어 (이벤트 핸들링) */}
+          <canvas
+            ref={vehicleCanvasRef}
             width={mapSize.width}
             height={mapSize.height}
             onMouseDown={handleCanvasMouseDown}
@@ -1208,7 +1316,7 @@ const RoadGame: React.FC = () => {
             onTouchStart={handleCanvasTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className="cursor-crosshair bg-white touch-none"
+            className="absolute top-0 left-0 cursor-crosshair touch-none"
             style={{ 
               width: '100%', 
               height: '100%',

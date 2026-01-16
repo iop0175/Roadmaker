@@ -88,6 +88,15 @@ export function interpolatePath(path: Point[], roads: Road[], intersections: Int
   // 원형 교차로 중심점들 (이미 처리한 원형 교차로 기록)
   const processedRoundabouts = new Set<string>();
   
+  // 원형 교차로 찾기 함수 (허용 오차 포함)
+  const findRoundaboutAt = (point: Point): Intersection | undefined => {
+    return intersections.find(inter => 
+      inter.isRoundabout && 
+      Math.abs(inter.point.x - point.x) < 10 && 
+      Math.abs(inter.point.y - point.y) < 10
+    );
+  };
+  
   for (let i = 0; i < path.length - 1; i++) {
     const p1 = path[i];
     const p2 = path[i+1];
@@ -99,11 +108,7 @@ export function interpolatePath(path: Point[], roads: Road[], intersections: Int
     }
     
     // 원형 교차로 체크 - p2가 원형 교차로 중심인지 (다음 지점이 원형 교차로)
-    const roundabout = intersections.find(inter => 
-      inter.isRoundabout && 
-      Math.abs(inter.point.x - p2.x) < 5 && 
-      Math.abs(inter.point.y - p2.y) < 5
-    );
+    const roundabout = findRoundaboutAt(p2);
     
     // p2가 원형 교차로이고 다음 점(p3)이 있는 경우: 진입 시점부터 호 경로 생성
     if (roundabout && i < path.length - 2) {
@@ -123,12 +128,22 @@ export function interpolatePath(path: Point[], roads: Road[], intersections: Int
       // p1에서 진입 지점까지 직선
       newPath.push({ x: entryX, y: entryY, speedMultiplier: 1.0 });
       
-      // 원형 교차로 호 경로 (반시계방향 = 이동방향 기준 오른쪽)
+      // 원형 교차로 호 경로 (항상 반시계방향 = 이동방향 기준 오른쪽)
+      // 직진, 좌회전, 우회전 모두 반시계방향으로 돌아야 함
       let angleDiff = exitAngle - entryAngle;
+      
+      // 반시계방향으로 정규화 (항상 음수 각도차)
       while (angleDiff > 0) angleDiff -= 2 * Math.PI;
       while (angleDiff < -2 * Math.PI) angleDiff += 2 * Math.PI;
       
-      const numArcPoints = Math.max(4, Math.ceil(Math.abs(angleDiff) / (Math.PI / 6)));
+      // 아주 작은 각도 차이(거의 직진)의 경우에도 호를 그리도록
+      // 직진일 때는 거의 180도 돌아야 함 (반대편으로 나가므로)
+      if (Math.abs(angleDiff) < 0.1) {
+        // 거의 같은 방향 = U턴에 가까움, 전체 원을 돌지 않도록 조정
+        angleDiff = -Math.PI * 0.5; // 최소 90도는 돌게
+      }
+      
+      const numArcPoints = Math.max(6, Math.ceil(Math.abs(angleDiff) / (Math.PI / 8)));
       for (let j = 1; j <= numArcPoints; j++) {
         const t = j / numArcPoints;
         const currentAngle = entryAngle + angleDiff * t;

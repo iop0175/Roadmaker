@@ -55,6 +55,9 @@ export function usePathfinding() {
         const road1 = roadList[i];
         const road2 = roadList[j];
         
+        // 고가도로는 다른 도로와 교차점을 생성하지 않음
+        if (road1.isOverpass || road2.isOverpass) continue;
+        
         if (!road1.controlPoint && !road2.controlPoint) {
           const intersection = getLineIntersection(
             road1.start, road1.end,

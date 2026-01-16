@@ -339,10 +339,14 @@ export function useGameState(): GameStateReturn {
   // 건물 비활성화 체크
   useEffect(() => {
     const cleanupInterval = setInterval(() => {
-      // 일시정지 중에는 건물 비활성화 및 파괴 카운트 증가 안함
-      if (isPaused || isGameOver) return;
-
       const now = Date.now();
+      
+      // 일시정지 중에는 모든 건물의 lastActiveTime을 현재 시간으로 업데이트하여 타이머 멈춤
+      if (isPaused || isGameOver) {
+        setBuildings(prev => prev.map(b => ({ ...b, lastActiveTime: now })));
+        return;
+      }
+
       const TIMEOUT = 45000;
       const GRACE_PERIOD = 15000;
 

@@ -633,7 +633,26 @@ export function useRoadDrawing({
             id: `road-${Date.now()}`,
             start: drawStart,
             end: currentEnd,
-            controlPoint: controlPoint || undefined,
+            // 고가차도는 자동으로 살짝 곡선이 생기도록 controlPoint 추가
+            controlPoint: activeTool === 'overpass' && !controlPoint
+              ? (() => {
+                  // 중간점에서 수직 방향으로 살짝 곡선
+                  const midX = (drawStart.x + currentEnd.x) / 2;
+                  const midY = (drawStart.y + currentEnd.y) / 2;
+                  const dx = currentEnd.x - drawStart.x;
+                  const dy = currentEnd.y - drawStart.y;
+                  const len = Math.sqrt(dx * dx + dy * dy);
+                  if (len < 20) return undefined; // 너무 짧으면 곡선 없음
+                  // 수직 방향으로 도로 길이의 15% 만큼 곡선
+                  const curveOffset = len * 0.15;
+                  const perpX = -dy / len;
+                  const perpY = dx / len;
+                  return {
+                    x: midX + perpX * curveOffset,
+                    y: midY + perpY * curveOffset
+                  };
+                })()
+              : (controlPoint || undefined),
             isBridge: isBridgeVal,
             isOverpass: activeTool === 'overpass' ? true : undefined,
             type: roadType,
