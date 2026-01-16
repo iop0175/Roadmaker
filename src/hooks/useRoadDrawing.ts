@@ -641,7 +641,20 @@ export function useRoadDrawing({
           
           finalRoads.push(newRoad);
           setRoads(finalRoads);
-          setIntersections(findIntersections(finalRoads, buildings));
+          // 교차로 재계산 시 기존 isRoundabout 속성 유지
+          setIntersections(prev => {
+            const newIntersections = findIntersections(finalRoads, buildings);
+            return newIntersections.map(newInter => {
+              const existing = prev.find(p => 
+                Math.abs(p.point.x - newInter.point.x) < 5 && 
+                Math.abs(p.point.y - newInter.point.y) < 5
+              );
+              if (existing && existing.isRoundabout) {
+                return { ...newInter, isRoundabout: true };
+              }
+              return newInter;
+            });
+          });
           setScore(prev => prev - cost);
         }
       } else {
@@ -680,9 +693,20 @@ export function useRoadDrawing({
     // 도로 삭제 후 교차점 갱신
     setRoads(prev => {
       const newRoads = prev.filter(r => r !== road);
-      // 교차점 재계산
-      const newIntersections = findIntersections(newRoads, buildings);
-      setIntersections(newIntersections);
+      // 교차점 재계산 시 기존 isRoundabout 속성 유지
+      setIntersections(prevIntersections => {
+        const newIntersections = findIntersections(newRoads, buildings);
+        return newIntersections.map(newInter => {
+          const existing = prevIntersections.find(p => 
+            Math.abs(p.point.x - newInter.point.x) < 5 && 
+            Math.abs(p.point.y - newInter.point.y) < 5
+          );
+          if (existing && existing.isRoundabout) {
+            return { ...newInter, isRoundabout: true };
+          }
+          return newInter;
+        });
+      });
       return newRoads;
     });
     setSelectedRoad(null);

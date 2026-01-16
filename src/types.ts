@@ -58,6 +58,7 @@ export interface Vehicle {
 export interface Intersection {
   point: Point;
   vehicleCount: number;
+  isRoundabout?: boolean; // 원형 교차로 여부
 }
 
 /** 강 세그먼트 */

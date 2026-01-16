@@ -4,13 +4,7 @@
  */
 
 import type { Intersection, Road, Vehicle, Point } from '../types';
-
-/**
- * 두 점 사이의 거리 계산
- */
-function distance(a: Point, b: Point): number {
-  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
-}
+import { distance } from '../utils';
 
 /**
  * 교차점 외곽선 렌더링 (도로보다 먼저 그려야 함)
@@ -20,10 +14,19 @@ export function renderIntersectionOutlines(
   intersections: Intersection[]
 ): void {
   intersections.forEach(intersection => {
-    ctx.fillStyle = '#9ca3af';
-    ctx.beginPath();
-    ctx.arc(intersection.point.x, intersection.point.y, 16, 0, Math.PI * 2);
-    ctx.fill();
+    if (intersection.isRoundabout) {
+      // 원형 교차로: 더 큰 외곽선 (진한 티얼)
+      ctx.fillStyle = '#0d7377';
+      ctx.beginPath();
+      ctx.arc(intersection.point.x, intersection.point.y, 32, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // 일반 교차로
+      ctx.fillStyle = '#9ca3af';
+      ctx.beginPath();
+      ctx.arc(intersection.point.x, intersection.point.y, 16, 0, Math.PI * 2);
+      ctx.fill();
+    }
   });
 }
 
@@ -35,10 +38,32 @@ export function renderIntersectionBodies(
   intersections: Intersection[]
 ): void {
   intersections.forEach(intersection => {
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
-    ctx.fill();
+    if (intersection.isRoundabout) {
+      // 원형 교차로: 도로 색상 링
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(intersection.point.x, intersection.point.y, 30, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 중앙 티얼 색상 원 (섬)
+      ctx.fillStyle = '#14b8a6';
+      ctx.beginPath();
+      ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 중앙 원의 외곽선
+      ctx.strokeStyle = '#0d9488';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      // 일반 교차로
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+    }
   });
 }
 
@@ -65,6 +90,37 @@ export function renderIntersections(
     const count = intersectionCounts.get(key) || 0;
     const isHeavyCongested = count >= 8; // 8대 이상이면 심각한 정체
     const isCongested = count >= 4;       // 4대 이상이면 정체
+
+    // 원형 교차로는 별도 렌더링
+    if (intersection.isRoundabout) {
+      // 원형 교차로 중앙에 회전 화살표 아이콘
+      ctx.save();
+      ctx.translate(intersection.point.x, intersection.point.y);
+      
+      // 회전 화살표 (시계 방향)
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      // 원형 화살표 (시계방향 회전 표시)
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, -Math.PI * 0.7, Math.PI * 0.5);
+      ctx.stroke();
+      
+      // 화살표 머리
+      const arrowAngle = Math.PI * 0.5;
+      const arrowX = 8 * Math.cos(arrowAngle);
+      const arrowY = 8 * Math.sin(arrowAngle);
+      ctx.beginPath();
+      ctx.moveTo(arrowX + 3, arrowY - 3);
+      ctx.lineTo(arrowX, arrowY);
+      ctx.lineTo(arrowX - 3, arrowY - 3);
+      ctx.stroke();
+      
+      ctx.restore();
+      return; // 원형 교차로는 여기서 종료
+    }
 
     // 정체 시 배경 원 (경고 표시)
     if (isHeavyCongested) {

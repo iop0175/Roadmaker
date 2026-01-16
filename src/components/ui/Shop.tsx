@@ -1,6 +1,6 @@
 /**
  * Shop Component
- * 아이템 구매 상점 (다리, 고속도로) - 심플한 디자인
+ * 아이템 구매 상점 (다리, 고속도로, 고가차도, 원형교차로) - 심플한 디자인
  */
 
 import React from 'react';
@@ -8,7 +8,7 @@ import type { Language } from '../../i18n';
 import { getTranslations } from '../../i18n';
 
 interface ShopItem {
-  id: 'bridge' | 'highway' | 'overpass';
+  id: 'bridge' | 'highway' | 'overpass' | 'roundabout';
   name: string;
   price: number;
   count: number;
@@ -21,8 +21,9 @@ interface ShopProps {
   bridgeCount: number;
   highwayCount: number;
   overpassCount: number;
+  roundaboutCount: number;
   language: Language;
-  onBuy: (item: 'bridge' | 'highway' | 'overpass', price: number) => void;
+  onBuy: (item: 'bridge' | 'highway' | 'overpass' | 'roundabout', price: number) => void;
 }
 
 export const Shop: React.FC<ShopProps> = ({
@@ -32,6 +33,7 @@ export const Shop: React.FC<ShopProps> = ({
   bridgeCount,
   highwayCount,
   overpassCount,
+  roundaboutCount,
   language,
   onBuy,
 }) => {
@@ -43,6 +45,7 @@ export const Shop: React.FC<ShopProps> = ({
     { id: 'bridge', name: t.bridge, price: 500, count: bridgeCount },
     { id: 'highway', name: t.highway, price: 300, count: highwayCount },
     { id: 'overpass', name: t.overpass, price: 700, count: overpassCount },
+    { id: 'roundabout', name: t.roundabout || '원형교차로', price: 400, count: roundaboutCount },
   ];
 
   const handleBuy = (item: ShopItem) => {

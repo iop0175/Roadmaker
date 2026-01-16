@@ -1,7 +1,7 @@
 /**
  * 유틸리티 함수 모음
  */
-import type { Point, RiverSegment, Building, Road } from './types';
+import type { Point, RiverSegment, Building, Road, Intersection } from './types';
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -64,6 +64,9 @@ export function sampleBezierCurve(
   end: Point, 
   segments: number = 10
 ): Point[] {
+  // segments가 0 이하면 시작점만 반환
+  if (segments <= 0) return [start];
+  
   const points: Point[] = [];
   for (let i = 0; i <= segments; i++) {
     const t = i / segments;
@@ -76,15 +79,75 @@ export function sampleBezierCurve(
 }
 
 /** 경로 부드럽게 만들기 (곡선 도로 보간 및 속도 정보 포함) */
-export function interpolatePath(path: Point[], roads: Road[]): Point[] {
+export function interpolatePath(path: Point[], roads: Road[], intersections: Intersection[] = []): Point[] {
   if (path.length < 2) return path;
   
   // 첫 포인트 초기화
   const newPath: Point[] = [{ ...path[0], speedMultiplier: 1.0 }];
   
+  // 원형 교차로 중심점들 (이미 처리한 원형 교차로 기록)
+  const processedRoundabouts = new Set<string>();
+  
   for (let i = 0; i < path.length - 1; i++) {
     const p1 = path[i];
     const p2 = path[i+1];
+    
+    // p1이 이미 처리된 원형 교차로 중심이면 건너뛰기
+    const p1Key = `${Math.round(p1.x)},${Math.round(p1.y)}`;
+    if (processedRoundabouts.has(p1Key)) {
+      continue;
+    }
+    
+    // 원형 교차로 체크 - p2가 원형 교차로 중심인지 (다음 지점이 원형 교차로)
+    const roundabout = intersections.find(inter => 
+      inter.isRoundabout && 
+      Math.abs(inter.point.x - p2.x) < 5 && 
+      Math.abs(inter.point.y - p2.y) < 5
+    );
+    
+    // p2가 원형 교차로이고 다음 점(p3)이 있는 경우: 진입 시점부터 호 경로 생성
+    if (roundabout && i < path.length - 2) {
+      const center = roundabout.point;
+      const p3 = path[i + 2]; // 원형 교차로 이후 다음 점
+      const radius = 22; // 원형 교차로 도로 반경
+      
+      // 진입 방향 (p1에서 center로 향하는 각도 - center 기준)
+      const entryAngle = Math.atan2(p1.y - center.y, p1.x - center.x);
+      // 진출 방향 (center에서 p3로 나가는 각도)
+      const exitAngle = Math.atan2(p3.y - center.y, p3.x - center.x);
+      
+      // 진입 지점 (교차로 외곽에서 시작)
+      const entryX = center.x + radius * Math.cos(entryAngle);
+      const entryY = center.y + radius * Math.sin(entryAngle);
+      
+      // p1에서 진입 지점까지 직선
+      newPath.push({ x: entryX, y: entryY, speedMultiplier: 1.0 });
+      
+      // 원형 교차로 호 경로 (반시계방향 = 이동방향 기준 오른쪽)
+      let angleDiff = exitAngle - entryAngle;
+      while (angleDiff > 0) angleDiff -= 2 * Math.PI;
+      while (angleDiff < -2 * Math.PI) angleDiff += 2 * Math.PI;
+      
+      const numArcPoints = Math.max(4, Math.ceil(Math.abs(angleDiff) / (Math.PI / 6)));
+      for (let j = 1; j <= numArcPoints; j++) {
+        const t = j / numArcPoints;
+        const currentAngle = entryAngle + angleDiff * t;
+        const arcX = center.x + radius * Math.cos(currentAngle);
+        const arcY = center.y + radius * Math.sin(currentAngle);
+        newPath.push({ x: arcX, y: arcY, speedMultiplier: 1.3 });
+      }
+      
+      // 진출 지점에서 p3까지 직선 추가
+      newPath.push({ ...p3, speedMultiplier: 1.0 });
+      
+      // 원형 교차로 중심을 처리됨으로 표시 (다음 루프에서 건너뛰기)
+      const centerKey = `${Math.round(center.x)},${Math.round(center.y)}`;
+      processedRoundabouts.add(centerKey);
+      
+      // i를 1 증가시켜서 center→p3 구간을 건너뛰기
+      i++;
+      continue;
+    }
     
     // 두 점을 연결하는 도로 찾기
     const road = roads.find(r => 

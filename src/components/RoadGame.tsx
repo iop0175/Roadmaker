@@ -149,7 +149,7 @@ const RoadGame: React.FC = () => {
   } = roadDrawing;
 
   // 상점 구매 핸들러
-  const handleShopBuy = useCallback((item: 'bridge' | 'highway' | 'overpass', price: number) => {
+  const handleShopBuy = useCallback((item: 'bridge' | 'highway' | 'overpass' | 'roundabout', price: number) => {
     if (score >= price) {
       setScore(prev => prev - price);
       if (item === 'bridge') {
@@ -158,9 +158,11 @@ const RoadGame: React.FC = () => {
         setHighwayCount(prev => prev + 1);
       } else if (item === 'overpass') {
         setOverpassCount(prev => prev + 1);
+      } else if (item === 'roundabout') {
+        gameState.setRoundaboutCount(prev => prev + 1);
       }
     }
-  }, [score, setScore, setBridgeCount, setHighwayCount, setOverpassCount]);
+  }, [score, setScore, setBridgeCount, setHighwayCount, setOverpassCount, gameState]);
 
   // 빌드 모드 토글 (도로 건설 모드)
   const toggleBuildMode = useCallback(() => {
@@ -168,15 +170,22 @@ const RoadGame: React.FC = () => {
       const newMode = !prev;
       // 빌드 모드 진입 시 일시정지, 빌드 모드 종료 시 재개
       setIsPaused(newMode);
-      // 빌드 모드 종료 시 도구 초기화
+      // 빌드 모드 종료 시 도구 초기화 및 건물 타이머 리셋
       if (!newMode) {
         setActiveTool('normal');
         setSelectedBuilding(null);
         setSelectedRoad(null);
+        // 빌드 모드 종료 시 모든 건물의 lastActiveTime을 현재로 갱신
+        // 빌드 모드 동안 경과한 시간이 파괴 카운터에 반영되지 않도록 함
+        const now = Date.now();
+        setBuildings(prevBuildings => prevBuildings.map(b => ({
+          ...b,
+          lastActiveTime: now
+        })));
       }
       return newMode;
     });
-  }, [setIsPaused, setActiveTool, setSelectedRoad]);
+  }, [setIsPaused, setActiveTool, setSelectedRoad, setBuildings]);
 
   // 건물에 연결된 도로 개수 계산
   const getConnectedRoadCount = useCallback((buildingId: string): number => {
@@ -233,6 +242,28 @@ const RoadGame: React.FC = () => {
       return; // 일반 모드에서는 도로 그리기 불가
     }
     
+    // 빌드 모드 - roundabout 도구일 때 교차로 클릭 체크
+    if (activeTool === 'roundabout') {
+      // 클릭한 위치에서 가장 가까운 교차로 찾기
+      const clickedIntersection = intersections.find(inter => 
+        distance(rawPoint, inter.point) < 30 && !inter.isRoundabout
+      );
+      
+      if (clickedIntersection && gameState.roundaboutCount > 0) {
+        // 원형 교차로 설치
+        setIntersections(prev => prev.map(inter => 
+          inter.point.x === clickedIntersection.point.x && 
+          inter.point.y === clickedIntersection.point.y
+            ? { ...inter, isRoundabout: true }
+            : inter
+        ));
+        gameState.setRoundaboutCount(prev => prev - 1);
+        setActiveTool('normal');
+        return;
+      }
+      return;
+    }
+    
     // 빌드 모드 - pan 도구일 때만 건물 클릭 체크
     if (activeTool === 'pan') {
       const clickedBuilding = buildings.find(b => distance(rawPoint, b.position) < 30);
@@ -249,7 +280,7 @@ const RoadGame: React.FC = () => {
     
     // 빌드 모드에서 도로 그리기 핸들러 호출
     handleMouseDown(e);
-  }, [isBuildMode, activeTool, buildings, handleMouseDown, setSelectedRoad]);
+  }, [isBuildMode, activeTool, buildings, intersections, gameState, handleMouseDown, setSelectedRoad, setIntersections, setActiveTool]);
 
   // 캔버스 터치 시작 래퍼 (모드에 따른 동작 분기)
   const handleCanvasTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -278,6 +309,26 @@ const RoadGame: React.FC = () => {
       return; // 일반 모드에서는 도로 그리기 불가
     }
     
+    // 빌드 모드 - roundabout 도구일 때 교차로 터치 체크
+    if (activeTool === 'roundabout') {
+      const clickedIntersection = intersections.find(inter => 
+        distance(rawPoint, inter.point) < 25 && !inter.isRoundabout
+      );
+      
+      if (clickedIntersection && gameState.roundaboutCount > 0) {
+        setIntersections(prev => prev.map(inter => 
+          inter.point.x === clickedIntersection.point.x && 
+          inter.point.y === clickedIntersection.point.y
+            ? { ...inter, isRoundabout: true }
+            : inter
+        ));
+        gameState.setRoundaboutCount(prev => prev - 1);
+        setActiveTool('normal');
+        return;
+      }
+      return;
+    }
+    
     // 빌드 모드 - pan 도구일 때만 건물 클릭 체크
     if (activeTool === 'pan') {
       const clickedBuilding = buildings.find(b => distance(rawPoint, b.position) < 30);
@@ -294,7 +345,7 @@ const RoadGame: React.FC = () => {
     
     // 빌드 모드에서 도로 그리기 핸들러 호출
     handleTouchStart(e);
-  }, [isBuildMode, activeTool, buildings, handleTouchStart, setSelectedRoad]);
+  }, [isBuildMode, activeTool, buildings, intersections, gameState, handleTouchStart, setSelectedRoad, setIntersections, setActiveTool]);
 
   // 마우스 휠로 줌 조절 - useEffect로 non-passive 이벤트 등록
   useEffect(() => {
@@ -408,8 +459,9 @@ const RoadGame: React.FC = () => {
     container.addEventListener('touchend', handleTouchEnd);
 
     return () => {
-      container.removeEventListener('touchstart', handleTouchStart);
-      container.removeEventListener('touchmove', handleTouchMove);
+      // 이벤트 리스너 제거 시에도 동일한 옵션 사용
+      container.removeEventListener('touchstart', handleTouchStart, { passive: false } as EventListenerOptions);
+      container.removeEventListener('touchmove', handleTouchMove, { passive: false } as EventListenerOptions);
       container.removeEventListener('touchend', handleTouchEnd);
     };
   }, [activeTool, mapSize, zoom]);
@@ -549,10 +601,19 @@ const RoadGame: React.FC = () => {
 
     // 교차점 외곽선
     intersections.forEach(intersection => {
-      ctx.fillStyle = theme.road;
-      ctx.beginPath();
-      ctx.arc(intersection.point.x, intersection.point.y, 16, 0, Math.PI * 2);
-      ctx.fill();
+      if (intersection.isRoundabout) {
+        // 원형 교차로: 큰 외곽선 (진한 티얼)
+        ctx.fillStyle = '#0d7377';
+        ctx.beginPath();
+        ctx.arc(intersection.point.x, intersection.point.y, 32, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // 일반 교차로
+        ctx.fillStyle = theme.road;
+        ctx.beginPath();
+        ctx.arc(intersection.point.x, intersection.point.y, 16, 0, Math.PI * 2);
+        ctx.fill();
+      }
     });
 
     // 도로 본체
@@ -572,10 +633,32 @@ const RoadGame: React.FC = () => {
 
     // 교차점 본체
     intersections.forEach(intersection => {
-      ctx.fillStyle = theme.roadStripe;
-      ctx.beginPath();
-      ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
-      ctx.fill();
+      if (intersection.isRoundabout) {
+        // 원형 교차로: 흰색 도로 링
+        ctx.fillStyle = theme.roadStripe;
+        ctx.beginPath();
+        ctx.arc(intersection.point.x, intersection.point.y, 30, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 중앙 티얼 색상 섬
+        ctx.fillStyle = '#14b8a6';
+        ctx.beginPath();
+        ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 중앙 원 외곽선
+        ctx.strokeStyle = '#0d9488';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        // 일반 교차로
+        ctx.fillStyle = theme.roadStripe;
+        ctx.beginPath();
+        ctx.arc(intersection.point.x, intersection.point.y, 14, 0, Math.PI * 2);
+        ctx.fill();
+      }
     });
 
     // 중앙선
@@ -602,6 +685,36 @@ const RoadGame: React.FC = () => {
 
     // 교차점 중앙 표시
     intersections.forEach(intersection => {
+      // 원형 교차로는 별도 렌더링
+      if (intersection.isRoundabout) {
+        // 회전 화살표 아이콘
+        ctx.save();
+        ctx.translate(intersection.point.x, intersection.point.y);
+        
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        // 원형 화살표
+        ctx.beginPath();
+        ctx.arc(0, 0, 8, -Math.PI * 0.7, Math.PI * 0.5);
+        ctx.stroke();
+        
+        // 화살표 머리
+        const arrowAngle = Math.PI * 0.5;
+        const arrowX = 8 * Math.cos(arrowAngle);
+        const arrowY = 8 * Math.sin(arrowAngle);
+        ctx.beginPath();
+        ctx.moveTo(arrowX + 3, arrowY - 3);
+        ctx.lineTo(arrowX, arrowY);
+        ctx.lineTo(arrowX - 3, arrowY - 3);
+        ctx.stroke();
+        
+        ctx.restore();
+        return; // 원형 교차로는 저지선 불필요
+      }
+      
       const key = `${intersection.point.x},${intersection.point.y}`;
       const count = intersectionCounts.get(key) || 0;
       const isCongested = count >= 5;
@@ -1039,6 +1152,7 @@ const RoadGame: React.FC = () => {
       {/* 세로 모드 헤더 */}
       <div className="landscape-hide w-full flex justify-center px-2 shrink-0">
         <Header
+          isBuildMode={isBuildMode}
           score={score}
           gameTime={gameTime}
           destroyedCount={destroyedCount}
@@ -1197,6 +1311,7 @@ const RoadGame: React.FC = () => {
           bridgeCount={bridgeCount}
           highwayCount={highwayCount}
           overpassCount={overpassCount}
+          roundaboutCount={gameState.roundaboutCount}
           language={language}
           isBuildMode={isBuildMode}
           onToolChange={setActiveTool}
@@ -1285,6 +1400,16 @@ const RoadGame: React.FC = () => {
                 <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M3 10h18M3 7l9-4 9 4M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" /></svg>
                 <span>고가</span>
                 <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">{overpassCount}</span>
+              </button>
+              <button
+                onClick={() => setActiveTool('roundabout')}
+                className={`w-full py-2 px-2 rounded-xl flex flex-col items-center justify-center text-xs font-bold shadow-md transition-transform active:scale-95 relative ${
+                  activeTool === 'roundabout' ? 'bg-teal-500 text-white' : 'bg-white text-slate-500 border border-slate-200'
+                }`}
+              >
+                <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="3" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 5V2M12 22v-3M5 12H2M22 12h-3" /></svg>
+                <span>원형</span>
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">{gameState.roundaboutCount}</span>
               </button>
             </>
           )}

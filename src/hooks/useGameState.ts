@@ -42,6 +42,8 @@ interface GameStateReturn {
   setHighwayCount: React.Dispatch<React.SetStateAction<number>>;
   overpassCount: number;
   setOverpassCount: React.Dispatch<React.SetStateAction<number>>;
+  roundaboutCount: number;
+  setRoundaboutCount: React.Dispatch<React.SetStateAction<number>>;
   activeTool: ActiveTool;
   setActiveTool: React.Dispatch<React.SetStateAction<ActiveTool>>;
   
@@ -92,6 +94,15 @@ export function useGameState(): GameStateReturn {
     }, 3000);
   }, []);
 
+  // 컴포넌트 언마운트 시 타임아웃 정리
+  useEffect(() => {
+    return () => {
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // 맵 크기
   const [mapSize, setMapSize] = useState({ width: CANVAS_WIDTH, height: CANVAS_HEIGHT });
 
@@ -111,6 +122,7 @@ export function useGameState(): GameStateReturn {
   const [bridgeCount, setBridgeCount] = useState(1);
   const [highwayCount, setHighwayCount] = useState(1);
   const [overpassCount, setOverpassCount] = useState(0);
+  const [roundaboutCount, setRoundaboutCount] = useState(0);
   const [activeTool, setActiveTool] = useState<ActiveTool>('normal');
   const [destroyedCount, setDestroyedCount] = useState(0);
   const destroyedBuildingIds = useRef<Set<string>>(new Set());
@@ -141,6 +153,7 @@ export function useGameState(): GameStateReturn {
     setBridgeCount(1);
     setHighwayCount(1);
     setOverpassCount(0);
+    setRoundaboutCount(0);
     setActiveTool('normal');
     setDestroyedCount(0);
     destroyedBuildingIds.current.clear();
@@ -395,6 +408,8 @@ export function useGameState(): GameStateReturn {
     setHighwayCount,
     overpassCount,
     setOverpassCount,
+    roundaboutCount,
+    setRoundaboutCount,
     activeTool,
     setActiveTool,
     mapSize,

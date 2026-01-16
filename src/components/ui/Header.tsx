@@ -12,6 +12,7 @@ interface HeaderProps {
   gameTime: number;
   destroyedCount: number;
   language: Language;
+  isBuildMode?: boolean; // 빌드 모드 여부
   onLanguageChange: (lang: Language) => void;
 }
 
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   gameTime,
   destroyedCount,
   language,
+  isBuildMode = false,
   onLanguageChange,
 }) => {
   const t = getTranslations(language);
@@ -67,7 +69,8 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </div>
 
-        {/* Stats: Broken */}
+        {/* Stats: Broken - 빌드 모드에서는 숨김 */}
+        {!isBuildMode && (
         <div className={`bg-gradient-to-br rounded-xl sm:rounded-2xl px-3 sm:px-5 py-2 sm:py-3 shadow-md border-2 flex flex-col justify-center min-w-[60px] sm:min-w-[110px] ${
           destroyedCount >= 2 
             ? 'from-rose-100 to-white border-rose-300 animate-pulse' 
@@ -87,6 +90,7 @@ export const Header: React.FC<HeaderProps> = ({
             {destroyedCount}/3
           </span>
         </div>
+        )}
       </div>
     </div>
   );

@@ -7,13 +7,14 @@ import React from 'react';
 import type { Language } from '../../i18n';
 import { getTranslations } from '../../i18n';
 
-export type ActiveTool = 'normal' | 'bridge' | 'highway' | 'overpass' | 'pan';
+export type ActiveTool = 'normal' | 'bridge' | 'highway' | 'overpass' | 'roundabout' | 'pan';
 
 interface HUDProps {
   activeTool: ActiveTool;
   bridgeCount: number;
   highwayCount: number;
   overpassCount: number;
+  roundaboutCount: number;
   language: Language;
   isBuildMode: boolean;
   onToolChange: (tool: ActiveTool) => void;
@@ -28,6 +29,7 @@ export const HUD: React.FC<HUDProps> = ({
   bridgeCount,
   highwayCount,
   overpassCount,
+  roundaboutCount,
   language,
   isBuildMode,
   onToolChange,
@@ -168,6 +170,29 @@ export const HUD: React.FC<HUDProps> = ({
             overpassCount > 0 ? 'bg-blue-500 text-white' : 'bg-slate-300 text-slate-500'
           }`}>
             {overpassCount}
+          </div>
+        </button>
+
+        {/* Roundabout Tool */}
+        <button
+          onClick={() => onToolChange('roundabout')}
+          className={`w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center transition-all duration-300 relative border-2 ${
+            activeTool === 'roundabout' 
+              ? 'bg-teal-500 text-white shadow-lg shadow-teal-300 scale-110 border-teal-400' 
+              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300'
+          }`}
+        >
+          <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <circle cx="12" cy="12" r="7" />
+            <circle cx="12" cy="12" r="3" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 5V2M12 22v-3M5 12H2M22 12h-3" />
+          </svg>
+          <span className="text-[9px] sm:text-xs font-extrabold tracking-wide uppercase">{t.roundabout}</span>
+          {/* Count Badge */}
+          <div className={`absolute -top-2 -right-2 min-w-[22px] sm:min-w-[26px] h-[22px] sm:h-[26px] px-1.5 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-black border-[3px] border-white shadow-md ${
+            roundaboutCount > 0 ? 'bg-blue-500 text-white' : 'bg-slate-300 text-slate-500'
+          }`}>
+            {roundaboutCount}
           </div>
         </button>
 

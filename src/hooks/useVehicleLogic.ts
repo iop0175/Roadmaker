@@ -64,7 +64,7 @@ export function useVehicleLogic({
 
     const rawPath = findPath(fromBuilding.position, toBuilding.position, roads);
     if (rawPath && rawPath.length >= 2) {
-      const path = interpolatePath(rawPath, roads);
+      const path = interpolatePath(rawPath, roads, intersections);
       const lane = 'right';
       const offset = getLaneOffset(path[0], path[1], lane);
       
@@ -127,8 +127,8 @@ export function useVehicleLogic({
     const homeBuilding = buildings.find(b => b.id === vehicle.fromBuilding);
     if (!officeBuilding || !homeBuilding) return null;
     const rawPath = findPath(officeBuilding.position, homeBuilding.position, roads);
-    return rawPath ? interpolatePath(rawPath, roads) : null;
-  }, [buildings, roads, findPath]);
+    return rawPath ? interpolatePath(rawPath, roads, intersections) : null;
+  }, [buildings, roads, intersections, findPath]);
 
   /** 메인 게임 루프 */
   useEffect(() => {
@@ -260,6 +260,9 @@ export function useVehicleLogic({
           
           if (!insideIntersection && !shouldWait) {
             intersections.forEach(intersection => {
+              // 원형 교차로에서는 대기 없이 바로 통과
+              if (intersection.isRoundabout) return;
+              
               const distToIntersection = distance(vehicle.position, intersection.point);
               if (distToIntersection >= 15 && distToIntersection < 35) {
                 const key = `${intersection.point.x},${intersection.point.y}`;
@@ -356,7 +359,7 @@ export function useVehicleLogic({
         const newRawPath = findPath(vehicle.position, targetBuilding.position, roads);
         if (!newRawPath || newRawPath.length < 2) return vehicle;
         
-        const newPath = interpolatePath(newRawPath, roads);
+        const newPath = interpolatePath(newRawPath, roads, intersections);
         if (newPath.length < 2) return vehicle;
         
         // 새 경로가 더 짧으면 경로 변경
