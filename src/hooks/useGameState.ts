@@ -106,7 +106,7 @@ export function useGameState(): GameStateReturn {
   vehiclesRef.current = vehicles;
 
   const [intersections, setIntersections] = useState<Intersection[]>([]);
-  const [score, setScore] = useState(1000);
+  const [score, setScore] = useState(1500);
   const [gameTime, setGameTime] = useState(0);
   const [bridgeCount, setBridgeCount] = useState(1);
   const [highwayCount, setHighwayCount] = useState(1);
@@ -136,7 +136,7 @@ export function useGameState(): GameStateReturn {
     setVehicles([]);
     setIntersections([]);
     
-    setScore(1000);
+    setScore(1500);
     setGameTime(0);
     setBridgeCount(1);
     setHighwayCount(1);
@@ -145,8 +145,23 @@ export function useGameState(): GameStateReturn {
     setDestroyedCount(0);
     destroyedBuildingIds.current.clear();
     setIsGameOver(false);
-    setIsPaused(false);
+    setIsPaused(true); // 새 게임도 빌드 모드로 시작
   }, []);
+
+  // 일시정지 해제 시 건물 타이머 리셋
+  const prevPausedRef = useRef(isPaused);
+  useEffect(() => {
+    // isPaused가 true -> false로 바뀔 때 (게임 시작)
+    if (prevPausedRef.current === true && isPaused === false) {
+      const now = Date.now();
+      setBuildings(prev => prev.map(b => ({
+        ...b,
+        lastActiveTime: now,
+        createdAt: now, // grace period도 리셋
+      })));
+    }
+    prevPausedRef.current = isPaused;
+  }, [isPaused]);
 
   // 생존 시간 타이머
   useEffect(() => {
