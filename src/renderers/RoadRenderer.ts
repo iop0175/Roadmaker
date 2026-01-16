@@ -133,8 +133,8 @@ function renderRoadBodies(ctx: CanvasRenderingContext2D, roads: Road[]): void {
     }
     ctx.stroke();
     
-    // 고가차도 본체 (보라색 계열)
-    ctx.strokeStyle = '#a78bfa';
+    // 고가차도 본체 (진한 보라색 계열)
+    ctx.strokeStyle = '#8b5cf6';
     ctx.lineWidth = ROAD_WIDTH;
     ctx.beginPath();
     ctx.moveTo(road.start.x, road.start.y);
@@ -146,7 +146,7 @@ function renderRoadBodies(ctx: CanvasRenderingContext2D, roads: Road[]): void {
     ctx.stroke();
     
     // 고가차도 끝점에 연결부 (원형) 렌더링
-    ctx.fillStyle = '#a78bfa';
+    ctx.fillStyle = '#8b5cf6';
     ctx.beginPath();
     ctx.arc(road.start.x, road.start.y, ROAD_WIDTH / 2, 0, Math.PI * 2);
     ctx.fill();
@@ -165,8 +165,8 @@ function renderRoadCenterLines(ctx: CanvasRenderingContext2D, roads: Road[]): vo
   ctx.lineJoin = 'round';
   
   roads.forEach(road => {
-    // 고가차도는 흰색 중앙선
-    ctx.strokeStyle = road.isOverpass ? '#ffffff' : '#fbbf24';
+    // 고가차도는 연한 보라색 중앙선 (진한 보라색 도로와 대비)
+    ctx.strokeStyle = road.isOverpass ? '#c4b5fd' : '#fbbf24';
     ctx.beginPath();
     ctx.moveTo(road.start.x, road.start.y);
     if (road.controlPoint) {
