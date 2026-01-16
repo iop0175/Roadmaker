@@ -1,0 +1,54 @@
+<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e0f2fe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#bae6fd;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="road" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  
+  <!-- River -->
+  <path d="M0 400 Q300 350 600 420 Q900 490 1200 440 L1200 480 Q900 530 600 460 Q300 390 0 440 Z" fill="#38bdf8" opacity="0.6"/>
+  
+  <!-- Roads -->
+  <line x1="150" y1="250" x2="500" y2="250" stroke="#9ca3af" stroke-width="24" stroke-linecap="round"/>
+  <line x1="150" y1="250" x2="500" y2="250" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>
+  <line x1="500" y1="250" x2="800" y2="350" stroke="#9ca3af" stroke-width="24" stroke-linecap="round"/>
+  <line x1="500" y1="250" x2="800" y2="350" stroke="#ffffff" stroke-width="18" stroke-linecap="round"/>
+  
+  <!-- Bridge -->
+  <line x1="800" y1="350" x2="1050" y2="300" stroke="#8b4513" stroke-width="26" stroke-linecap="round"/>
+  <line x1="800" y1="350" x2="1050" y2="300" stroke="#d4a373" stroke-width="20" stroke-linecap="round"/>
+  
+  <!-- Center lines -->
+  <line x1="150" y1="250" x2="500" y2="250" stroke="#fbbf24" stroke-width="2"/>
+  <line x1="500" y1="250" x2="800" y2="350" stroke="#fbbf24" stroke-width="2"/>
+  <line x1="800" y1="350" x2="1050" y2="300" stroke="#fbbf24" stroke-width="2"/>
+  
+  <!-- Home (triangle roof) -->
+  <rect x="100" y="200" width="50" height="50" rx="4" fill="#ef4444"/>
+  <polygon points="125,165 85,200 165,200" fill="#dc2626"/>
+  
+  <!-- Office (rectangle) -->
+  <rect x="1020" y="250" width="60" height="50" rx="4" fill="#3b82f6"/>
+  <rect x="1030" y="260" width="10" height="15" fill="#93c5fd"/>
+  <rect x="1050" y="260" width="10" height="15" fill="#93c5fd"/>
+  <rect x="1030" y="280" width="10" height="15" fill="#93c5fd"/>
+  <rect x="1050" y="280" width="10" height="15" fill="#93c5fd"/>
+  
+  <!-- Cars -->
+  <circle cx="320" cy="250" r="8" fill="#22c55e"/>
+  <circle cx="650" cy="300" r="8" fill="#f59e0b"/>
+  <circle cx="920" cy="325" r="8" fill="#8b5cf6"/>
+  
+  <!-- Title -->
+  <text x="600" y="540" font-family="system-ui, sans-serif" font-size="72" font-weight="bold" fill="#0f172a" text-anchor="middle">Roadmaker</text>
+  <text x="600" y="590" font-family="system-ui, sans-serif" font-size="28" fill="#475569" text-anchor="middle">도시 도로 생존 전략 게임</text>
+</svg>
