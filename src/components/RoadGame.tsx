@@ -62,8 +62,8 @@ const RoadGame: React.FC = () => {
   const roadCanvasRef = useRef<HTMLCanvasElement>(null);    // 도로, 교차점
   const buildingCanvasRef = useRef<HTMLCanvasElement>(null); // 건물
   const vehicleCanvasRef = useRef<HTMLCanvasElement>(null); // 차량
-  const uiCanvasRef = useRef<HTMLCanvasElement>(null);      // UI (프리뷰, 선택)
-  const canvasRef = vehicleCanvasRef; // 기존 이벤트 핸들러 호환성
+  // const uiCanvasRef = useRef<HTMLCanvasElement>(null);      // UI (프리뷰, 선택)
+  // const canvasRef = vehicleCanvasRef; // 기존 이벤트 핸들러 호환성
   
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(getInitialZoom); // 모바일: 40%, 데스크톱: 75%
@@ -771,7 +771,7 @@ const RoadGame: React.FC = () => {
     vehicleCtx.clearRect(0, 0, mapSize.width, mapSize.height);
 
     const ctx = buildingCtx; // 건물 렌더링용
-    const now = Date.now();
+    // const now = Date.now();
 
     // 건물 렌더링
     buildings.forEach(building => {
@@ -1385,6 +1385,7 @@ const RoadGame: React.FC = () => {
         bridgeCount={bridgeCount}
         highwayCount={highwayCount}
         overpassCount={overpassCount}
+        roundaboutCount={gameState.roundaboutCount}
         language={language}
         onBuy={handleShopBuy}
       />

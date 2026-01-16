@@ -3,7 +3,7 @@
  * 교차점 렌더링 함수 (외곽선, 본체, 저지선, 혼잡도 표시)
  */
 
-import type { Intersection, Road, Vehicle, Point } from '../types';
+import type { Intersection, Road, Vehicle } from '../types';
 import { distance } from '../utils';
 
 /**
