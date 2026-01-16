@@ -170,7 +170,8 @@ export function interpolatePath(path: Point[], roads: Road[], intersections: Int
       (distance(r.start, p2) < 5 && distance(r.end, p1) < 5)
     );
     
-    const speed = road?.type === 'highway' ? 1.5 : 1.0;
+    // 속도 배율 설정: 고가도로 1.3배, 고속도로 1.5배, 일반 도로 1.0배
+    const speed = road?.isOverpass ? 1.3 : (road?.type === 'highway' ? 1.5 : 1.0);
 
     // 곡선 도로인 경우 샘플링
     if (road && road.controlPoint) {
