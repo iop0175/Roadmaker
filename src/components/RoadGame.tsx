@@ -33,6 +33,7 @@ import {
   getUpgradeCost,
   WarningMessage,
   Shop,
+  Tutorial,
 } from './ui';
 import type { Building } from '../types';
 
@@ -63,7 +64,8 @@ const RoadGame: React.FC = () => {
   const isPanningRef = useRef(false);
   const [isShopOpen, setIsShopOpen] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<Building | null>(null);
-  const [isBuildMode, setIsBuildMode] = useState(false); // 빌드 모드 (도로 건설/아이템 사용)
+  const [isBuildMode, setIsBuildMode] = useState(true); // 빌드 모드 (도로 건설/아이템 사용) - 처음엔 빌드 모드로 시작
+  const [showTutorial, setShowTutorial] = useState(true); // 튜토리얼 표시 여부
   const lastPanPosRef = useRef({ x: 0, y: 0 });
 
   // 게임 상태 훅
@@ -83,6 +85,8 @@ const RoadGame: React.FC = () => {
     setBridgeCount,
     highwayCount,
     setHighwayCount,
+    overpassCount,
+    setOverpassCount,
     activeTool,
     setActiveTool,
     mapSize,
@@ -119,6 +123,8 @@ const RoadGame: React.FC = () => {
     setBridgeCount,
     highwayCount,
     setHighwayCount,
+    overpassCount,
+    setOverpassCount,
     language,
     showWarning,
   });
@@ -142,16 +148,18 @@ const RoadGame: React.FC = () => {
   } = roadDrawing;
 
   // 상점 구매 핸들러
-  const handleShopBuy = useCallback((item: 'bridge' | 'highway', price: number) => {
+  const handleShopBuy = useCallback((item: 'bridge' | 'highway' | 'overpass', price: number) => {
     if (score >= price) {
       setScore(prev => prev - price);
       if (item === 'bridge') {
         setBridgeCount(prev => prev + 1);
       } else if (item === 'highway') {
         setHighwayCount(prev => prev + 1);
+      } else if (item === 'overpass') {
+        setOverpassCount(prev => prev + 1);
       }
     }
-  }, [score, setScore, setBridgeCount, setHighwayCount]);
+  }, [score, setScore, setBridgeCount, setHighwayCount, setOverpassCount]);
 
   // 빌드 모드 토글 (도로 건설 모드)
   const toggleBuildMode = useCallback(() => {
@@ -1141,8 +1149,19 @@ const RoadGame: React.FC = () => {
         score={score}
         bridgeCount={bridgeCount}
         highwayCount={highwayCount}
+        overpassCount={overpassCount}
         language={language}
         onBuy={handleShopBuy}
+      />
+
+      {/* 튜토리얼 */}
+      <Tutorial
+        isOpen={showTutorial}
+        onClose={() => {
+          setShowTutorial(false);
+          setIsBuildMode(true); // 튜토리얼 종료 후 건설 모드로 시작
+        }}
+        language={language}
       />
 
       {/* 교차점 표시 - 세로 모드에서만 */}
@@ -1164,6 +1183,7 @@ const RoadGame: React.FC = () => {
           activeTool={activeTool}
           bridgeCount={bridgeCount}
           highwayCount={highwayCount}
+          overpassCount={overpassCount}
           language={language}
           isBuildMode={isBuildMode}
           onToolChange={setActiveTool}
@@ -1242,6 +1262,16 @@ const RoadGame: React.FC = () => {
                 <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                 <span>고속</span>
                 <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">{highwayCount}</span>
+              </button>
+              <button
+                onClick={() => setActiveTool('overpass')}
+                className={`w-full py-2 px-2 rounded-xl flex flex-col items-center justify-center text-xs font-bold shadow-md transition-transform active:scale-95 relative ${
+                  activeTool === 'overpass' ? 'bg-purple-500 text-white' : 'bg-white text-slate-500 border border-slate-200'
+                }`}
+              >
+                <svg className="w-6 h-6 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M3 10h18M3 7l9-4 9 4M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" /></svg>
+                <span>고가</span>
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">{overpassCount}</span>
               </button>
             </>
           )}

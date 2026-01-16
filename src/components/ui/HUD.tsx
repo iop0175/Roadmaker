@@ -7,12 +7,13 @@ import React from 'react';
 import type { Language } from '../../i18n';
 import { getTranslations } from '../../i18n';
 
-export type ActiveTool = 'normal' | 'bridge' | 'highway' | 'pan';
+export type ActiveTool = 'normal' | 'bridge' | 'highway' | 'overpass' | 'pan';
 
 interface HUDProps {
   activeTool: ActiveTool;
   bridgeCount: number;
   highwayCount: number;
+  overpassCount: number;
   language: Language;
   isBuildMode: boolean;
   onToolChange: (tool: ActiveTool) => void;
@@ -26,6 +27,7 @@ export const HUD: React.FC<HUDProps> = ({
   activeTool,
   bridgeCount,
   highwayCount,
+  overpassCount,
   language,
   isBuildMode,
   onToolChange,
@@ -145,6 +147,27 @@ export const HUD: React.FC<HUDProps> = ({
             highwayCount > 0 ? 'bg-blue-500 text-white' : 'bg-slate-300 text-slate-500'
           }`}>
             {highwayCount}
+          </div>
+        </button>
+
+        {/* Overpass Tool */}
+        <button
+          onClick={() => onToolChange('overpass')}
+          className={`w-14 h-14 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center transition-all duration-300 relative border-2 ${
+            activeTool === 'overpass' 
+              ? 'bg-purple-500 text-white shadow-lg shadow-purple-300 scale-110 border-purple-400' 
+              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300'
+          }`}
+        >
+          <svg className="w-6 h-6 sm:w-8 sm:h-8 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M3 10h18M3 7l9-4 9 4M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
+          </svg>
+          <span className="text-[9px] sm:text-xs font-extrabold tracking-wide uppercase">{t.overpass}</span>
+          {/* Count Badge */}
+          <div className={`absolute -top-2 -right-2 min-w-[22px] sm:min-w-[26px] h-[22px] sm:h-[26px] px-1.5 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-black border-[3px] border-white shadow-md ${
+            overpassCount > 0 ? 'bg-blue-500 text-white' : 'bg-slate-300 text-slate-500'
+          }`}>
+            {overpassCount}
           </div>
         </button>
 

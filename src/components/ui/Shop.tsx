@@ -8,7 +8,7 @@ import type { Language } from '../../i18n';
 import { getTranslations } from '../../i18n';
 
 interface ShopItem {
-  id: 'bridge' | 'highway';
+  id: 'bridge' | 'highway' | 'overpass';
   name: string;
   price: number;
   count: number;
@@ -20,8 +20,9 @@ interface ShopProps {
   score: number;
   bridgeCount: number;
   highwayCount: number;
+  overpassCount: number;
   language: Language;
-  onBuy: (item: 'bridge' | 'highway', price: number) => void;
+  onBuy: (item: 'bridge' | 'highway' | 'overpass', price: number) => void;
 }
 
 export const Shop: React.FC<ShopProps> = ({
@@ -30,6 +31,7 @@ export const Shop: React.FC<ShopProps> = ({
   score,
   bridgeCount,
   highwayCount,
+  overpassCount,
   language,
   onBuy,
 }) => {
@@ -40,6 +42,7 @@ export const Shop: React.FC<ShopProps> = ({
   const items: ShopItem[] = [
     { id: 'bridge', name: t.bridge, price: 500, count: bridgeCount },
     { id: 'highway', name: t.highway, price: 300, count: highwayCount },
+    { id: 'overpass', name: t.overpass, price: 700, count: overpassCount },
   ];
 
   const handleBuy = (item: ShopItem) => {

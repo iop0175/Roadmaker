@@ -30,6 +30,9 @@ export const MAX_BRIDGE_LENGTH = 180; // 다리 최대 길이 (120 -> 180으로 
 export const RIVER_MIN_WIDTH = 60;  // 다리 최대 길이보다 좁게
 export const RIVER_MAX_WIDTH = 150; // 다리로 건널 수 있는 최대 폭 (100 -> 150으로 증가)
 
+// ============ 고가차도 설정 ============
+export const MAX_OVERPASS_LENGTH = 200; // 고가차도 최대 길이
+
 // ============ 도로 설정 ============
 export const ROAD_WIDTH = 18;
 export const ROAD_OUTLINE_WIDTH = 22;

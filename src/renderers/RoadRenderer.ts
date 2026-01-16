@@ -14,7 +14,8 @@ function renderRoadOutlines(ctx: CanvasRenderingContext2D, roads: Road[]): void 
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   
-  roads.forEach(road => {
+  // 고가차도 외곽선은 본체에서 처리하므로 제외
+  roads.filter(r => !r.isOverpass).forEach(road => {
     ctx.strokeStyle = road.isBridge ? '#8b4513' : '#9ca3af';
     ctx.beginPath();
     ctx.moveTo(road.start.x, road.start.y);
@@ -35,8 +36,8 @@ function renderRoadBodies(ctx: CanvasRenderingContext2D, roads: Road[]): void {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   
-  // 일반 도로 먼저 렌더링
-  roads.filter(r => !r.isBridge).forEach(road => {
+  // 일반 도로 먼저 렌더링 (고가차도/다리 제외)
+  roads.filter(r => !r.isBridge && !r.isOverpass).forEach(road => {
     ctx.strokeStyle = road.type === 'highway' ? '#93c5fd' : '#ffffff';
     ctx.beginPath();
     ctx.moveTo(road.start.x, road.start.y);
@@ -48,7 +49,7 @@ function renderRoadBodies(ctx: CanvasRenderingContext2D, roads: Road[]): void {
     ctx.stroke();
   });
   
-  // 다리는 나중에 렌더링 (위에 그려짐)
+  // 다리 렌더링
   roads.filter(r => r.isBridge).forEach(road => {
     ctx.strokeStyle = '#d4a373';
     ctx.beginPath();
@@ -69,18 +70,103 @@ function renderRoadBodies(ctx: CanvasRenderingContext2D, roads: Road[]): void {
     ctx.arc(road.end.x, road.end.y, ROAD_WIDTH / 2, 0, Math.PI * 2);
     ctx.fill();
   });
+  
+  // 고가차도는 맨 마지막에 렌더링 (위에 그려짐)
+  roads.filter(r => r.isOverpass).forEach(road => {
+    // 그림자 (아래에 그려짐)
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.lineWidth = ROAD_WIDTH + 6;
+    ctx.beginPath();
+    ctx.moveTo(road.start.x + 4, road.start.y + 4);
+    if (road.controlPoint) {
+      ctx.quadraticCurveTo(road.controlPoint.x + 4, road.controlPoint.y + 4, road.end.x + 4, road.end.y + 4);
+    } else {
+      ctx.lineTo(road.end.x + 4, road.end.y + 4);
+    }
+    ctx.stroke();
+    ctx.restore();
+    
+    // 고가차도 기둥 (양 끝과 중간)
+    const pillarColor = '#6b7280';
+    ctx.fillStyle = pillarColor;
+    
+    // 시작 기둥
+    ctx.beginPath();
+    ctx.arc(road.start.x, road.start.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 끝 기둥
+    ctx.beginPath();
+    ctx.arc(road.end.x, road.end.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // 중간 기둥들
+    const dx = road.end.x - road.start.x;
+    const dy = road.end.y - road.start.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const pillarCount = Math.max(1, Math.floor(length / 50)); // 50px마다 기둥
+    for (let i = 1; i < pillarCount; i++) {
+      const t = i / pillarCount;
+      let px, py;
+      if (road.controlPoint) {
+        px = (1 - t) * (1 - t) * road.start.x + 2 * (1 - t) * t * road.controlPoint.x + t * t * road.end.x;
+        py = (1 - t) * (1 - t) * road.start.y + 2 * (1 - t) * t * road.controlPoint.y + t * t * road.end.y;
+      } else {
+        px = road.start.x + t * dx;
+        py = road.start.y + t * dy;
+      }
+      ctx.beginPath();
+      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // 고가차도 외곽선
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = ROAD_OUTLINE_WIDTH;
+    ctx.beginPath();
+    ctx.moveTo(road.start.x, road.start.y);
+    if (road.controlPoint) {
+      ctx.quadraticCurveTo(road.controlPoint.x, road.controlPoint.y, road.end.x, road.end.y);
+    } else {
+      ctx.lineTo(road.end.x, road.end.y);
+    }
+    ctx.stroke();
+    
+    // 고가차도 본체 (보라색 계열)
+    ctx.strokeStyle = '#a78bfa';
+    ctx.lineWidth = ROAD_WIDTH;
+    ctx.beginPath();
+    ctx.moveTo(road.start.x, road.start.y);
+    if (road.controlPoint) {
+      ctx.quadraticCurveTo(road.controlPoint.x, road.controlPoint.y, road.end.x, road.end.y);
+    } else {
+      ctx.lineTo(road.end.x, road.end.y);
+    }
+    ctx.stroke();
+    
+    // 고가차도 끝점에 연결부 (원형) 렌더링
+    ctx.fillStyle = '#a78bfa';
+    ctx.beginPath();
+    ctx.arc(road.start.x, road.start.y, ROAD_WIDTH / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(road.end.x, road.end.y, ROAD_WIDTH / 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
 }
 
 /**
  * 도로 중앙선 렌더링
  */
 function renderRoadCenterLines(ctx: CanvasRenderingContext2D, roads: Road[]): void {
-  ctx.strokeStyle = '#fbbf24';
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   
   roads.forEach(road => {
+    // 고가차도는 흰색 중앙선
+    ctx.strokeStyle = road.isOverpass ? '#ffffff' : '#fbbf24';
     ctx.beginPath();
     ctx.moveTo(road.start.x, road.start.y);
     if (road.controlPoint) {

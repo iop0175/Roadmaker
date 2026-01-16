@@ -19,6 +19,7 @@ interface Translations {
   road: string;
   bridge: string;
   highway: string;
+  overpass: string;
   pan: string;
   straight: string;
   curve: string;
@@ -75,6 +76,7 @@ const translations: Record<Language, Translations> = {
     road: 'Road',
     bridge: 'Bridge',
     highway: 'Highway',
+    overpass: 'Overpass',
     pan: 'Move',
     straight: 'Straight (F)',
     curve: 'Curve (Shift)',
@@ -129,6 +131,7 @@ const translations: Record<Language, Translations> = {
     road: '도로',
     bridge: '다리',
     highway: '고속도로',
+    overpass: '고가차도',
     pan: '이동',
     straight: '직선 (F)',
     curve: '곡선 (Shift)',

@@ -12,3 +12,4 @@ export { RoadPopover } from './RoadPopover';
 export { BuildingPopover, getUpgradeCost } from './BuildingPopover';
 export { WarningMessage } from './WarningMessage';
 export { Shop } from './Shop';
+export { Tutorial } from './Tutorial';

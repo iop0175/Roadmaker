@@ -16,6 +16,7 @@ export interface Road {
   end: Point;
   controlPoint?: Point; // 베지어 곡선 컨트롤 포인트
   isBridge?: boolean; // 다리 여부
+  isOverpass?: boolean; // 고가차도 여부 (도로/건물 위로 지나감)
   type?: 'normal' | 'highway'; // 도로 타입
 }
 

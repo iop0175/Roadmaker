@@ -40,6 +40,8 @@ interface GameStateReturn {
   setBridgeCount: React.Dispatch<React.SetStateAction<number>>;
   highwayCount: number;
   setHighwayCount: React.Dispatch<React.SetStateAction<number>>;
+  overpassCount: number;
+  setOverpassCount: React.Dispatch<React.SetStateAction<number>>;
   activeTool: ActiveTool;
   setActiveTool: React.Dispatch<React.SetStateAction<ActiveTool>>;
   
@@ -108,11 +110,12 @@ export function useGameState(): GameStateReturn {
   const [gameTime, setGameTime] = useState(0);
   const [bridgeCount, setBridgeCount] = useState(1);
   const [highwayCount, setHighwayCount] = useState(1);
+  const [overpassCount, setOverpassCount] = useState(0);
   const [activeTool, setActiveTool] = useState<ActiveTool>('normal');
   const [destroyedCount, setDestroyedCount] = useState(0);
   const destroyedBuildingIds = useRef<Set<string>>(new Set());
   const [isGameOver, setIsGameOver] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [isPaused, setIsPaused] = useState(true); // 처음엔 빌드 모드이므로 일시정지
   const [gameSpeed, setGameSpeed] = useState(1);
 
   // 낮/밤 모드 (3분마다 전환, 게임 시간 기준)
@@ -137,6 +140,7 @@ export function useGameState(): GameStateReturn {
     setGameTime(0);
     setBridgeCount(1);
     setHighwayCount(1);
+    setOverpassCount(0);
     setActiveTool('normal');
     setDestroyedCount(0);
     destroyedBuildingIds.current.clear();
@@ -359,6 +363,8 @@ export function useGameState(): GameStateReturn {
     setBridgeCount,
     highwayCount,
     setHighwayCount,
+    overpassCount,
+    setOverpassCount,
     activeTool,
     setActiveTool,
     mapSize,

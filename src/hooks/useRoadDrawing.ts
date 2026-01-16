@@ -8,7 +8,7 @@ import type { Point, Road, Building, Intersection, RiverSegment } from '../types
 import type { Language } from '../i18n';
 import { getTranslations } from '../i18n';
 import type { ActiveTool } from '../components/ui';
-import { GRID_SIZE, MAX_BRIDGE_LENGTH } from '../constants';
+import { GRID_SIZE, MAX_BRIDGE_LENGTH, MAX_OVERPASS_LENGTH } from '../constants';
 import { distance, snapToGrid, doRoadsOverlap } from '../utils';
 import { useCollision } from './useCollision';
 import { useIntersections } from './useIntersections';
@@ -28,6 +28,8 @@ interface UseRoadDrawingProps {
   setBridgeCount: React.Dispatch<React.SetStateAction<number>>;
   highwayCount: number;
   setHighwayCount: React.Dispatch<React.SetStateAction<number>>;
+  overpassCount: number;
+  setOverpassCount: React.Dispatch<React.SetStateAction<number>>;
   language: Language;
   showWarning: (message: string) => void;
 }
@@ -47,6 +49,8 @@ export function useRoadDrawing({
   setBridgeCount,
   highwayCount,
   setHighwayCount,
+  overpassCount,
+  setOverpassCount,
   language,
   showWarning,
 }: UseRoadDrawingProps) {
@@ -373,6 +377,20 @@ export function useRoadDrawing({
       }
     }
 
+    // 고가차도 모드 길이 제한
+    if (activeTool === 'overpass') {
+      const dist = distance(drawStart, point);
+      if (dist > MAX_OVERPASS_LENGTH) {
+        const dx = point.x - drawStart.x;
+        const dy = point.y - drawStart.y;
+        const ratio = MAX_OVERPASS_LENGTH / dist;
+        point = {
+          x: drawStart.x + dx * ratio,
+          y: drawStart.y + dy * ratio,
+        };
+      }
+    }
+
     setCurrentEnd(point);
 
     if (isCurveMode) {
@@ -416,10 +434,13 @@ export function useRoadDrawing({
         const overlapsRoad = doRoadsOverlap(drawStart, currentEnd, roads, controlPoint || undefined);
         const overlapsBuilding = doesRoadIntersectAnyBuilding(drawStart, currentEnd, controlPoint || undefined);
         
-        // 다리 중간 연결 체크 (시작점 또는 끝점이 다리 중간에 연결되는 경우)
+        // 고가차도는 도로/건물 충돌을 무시
+        const isOverpassMode = activeTool === 'overpass';
+        
+        // 다리/고가차도 중간 연결 체크 (시작점 또는 끝점이 다리/고가차도 중간에 연결되는 경우)
         const connectsToBridgeMiddle = isConnectingToBridgeMiddle(drawStart) || isConnectingToBridgeMiddle(currentEnd);
         
-        if (connectsToBridgeMiddle) {
+        if (connectsToBridgeMiddle && !isOverpassMode) {
           showWarning(language === 'ko' ? '다리의 양쪽 끝점에만 도로를 연결할 수 있습니다' : 'Roads can only connect to bridge endpoints');
           setIsDrawing(false);
           setDrawStart(null);
@@ -428,10 +449,10 @@ export function useRoadDrawing({
           return;
         }
         
-        // 다리 끝점에 이미 도로가 연결되어 있는지 체크
+        // 다리 끝점에 이미 도로가 연결되어 있는지 체크 (고가차도는 예외)
         const bridgeEndpointConnected = isBridgeEndpointAlreadyConnected(drawStart) || isBridgeEndpointAlreadyConnected(currentEnd);
         
-        if (bridgeEndpointConnected) {
+        if (bridgeEndpointConnected && !isOverpassMode) {
           showWarning(language === 'ko' ? '다리 끝점에는 1개의 도로만 연결할 수 있습니다' : 'Only one road can connect to a bridge endpoint');
           setIsDrawing(false);
           setDrawStart(null);
@@ -440,10 +461,24 @@ export function useRoadDrawing({
           return;
         }
         
-        // 건물에 이미 도로가 연결되어 있는지 체크 (1개만 허용)
+        // 건물에 이미 도로가 연결되어 있는지 체크 (1개만 허용, 고가차도는 건물 연결 불가)
         const buildingConnected = isBuildingAlreadyConnected(drawStart) || isBuildingAlreadyConnected(currentEnd);
         
-        if (buildingConnected) {
+        // 고가차도가 건물에 직접 연결되려고 하면 차단
+        if (isOverpassMode) {
+          const startOnBuilding = buildings.some(b => distance(drawStart, b.position) < 5);
+          const endOnBuilding = buildings.some(b => distance(currentEnd, b.position) < 5);
+          if (startOnBuilding || endOnBuilding) {
+            showWarning(language === 'ko' ? '고가차도는 건물에 직접 연결할 수 없습니다' : 'Overpass cannot connect directly to buildings');
+            setIsDrawing(false);
+            setDrawStart(null);
+            setCurrentEnd(null);
+            setControlPoint(null);
+            return;
+          }
+        }
+        
+        if (buildingConnected && !isOverpassMode) {
           showWarning(language === 'ko' ? '건물에는 1개의 도로만 연결할 수 있습니다' : 'Only one road can connect to a building');
           setIsDrawing(false);
           setDrawStart(null);
@@ -452,7 +487,8 @@ export function useRoadDrawing({
           return;
         }
         
-        if (!overlapsRoad && !overlapsBuilding) {
+        // 고가차도는 도로/건물 충돌 무시
+        if (!overlapsRoad && !overlapsBuilding || isOverpassMode) {
           const dist = distance(drawStart, currentEnd);
           let cost = Math.ceil(dist);
           
@@ -491,6 +527,17 @@ export function useRoadDrawing({
               cost = 0;
               isBridgeVal = true;
             }
+          } else if (activeTool === 'overpass') {
+            // 고가차도: 도로/건물/강 위로 지나갈 수 있음
+            if (overpassCount <= 0) {
+              showWarning(language === 'ko' ? '고가차도 건설권이 부족합니다!' : 'No overpass items!');
+              setIsDrawing(false);
+              setDrawStart(null);
+              setCurrentEnd(null);
+              setControlPoint(null);
+              return;
+            }
+            cost = 0;
           } else {
             // 일반 도로: 강을 건너면 무조건 불가 (다리 끝점 연결 여부와 무관)
             if (crossesRiver) {
@@ -517,6 +564,9 @@ export function useRoadDrawing({
           }
           if (isBridgeVal) {
             setBridgeCount(prev => prev - 1);
+          }
+          if (activeTool === 'overpass') {
+            setOverpassCount(prev => prev - 1);
           }
 
           let finalRoads = [...roads];
@@ -549,8 +599,11 @@ export function useRoadDrawing({
             }
           };
 
-          checkAndSplit(drawStart);
-          checkAndSplit(currentEnd);
+          // 고가차도는 도로 분할 안함 (위로 지나가므로)
+          if (activeTool !== 'overpass') {
+            checkAndSplit(drawStart);
+            checkAndSplit(currentEnd);
+          }
 
           const newRoad: Road = {
             id: `road-${Date.now()}`,
@@ -558,6 +611,7 @@ export function useRoadDrawing({
             end: currentEnd,
             controlPoint: controlPoint || undefined,
             isBridge: isBridgeVal,
+            isOverpass: activeTool === 'overpass' ? true : undefined,
             type: roadType,
           };
           
@@ -581,10 +635,10 @@ export function useRoadDrawing({
     setControlPoint(null);
   }, [
     isDrawing, drawStart, currentEnd, controlPoint, roads, buildings,
-    activeTool, score, bridgeCount, highwayCount, language,
+    activeTool, score, bridgeCount, highwayCount, overpassCount, language,
     doesRoadCrossRiver, doesCurveRoadCrossRiver, doesRoadIntersectAnyBuilding,
     findIntersections, getRoadAtPoint, isConnectingToBridgeMiddle, isBridgeEndpointAlreadyConnected,
-    isBuildingAlreadyConnected, setRoads, setIntersections, setScore, setBridgeCount, setHighwayCount, showWarning, t
+    isBuildingAlreadyConnected, setRoads, setIntersections, setScore, setBridgeCount, setHighwayCount, setOverpassCount, showWarning, t
   ]);
 
   /** 도로 삭제 */
@@ -594,11 +648,13 @@ export function useRoadDrawing({
       setBridgeCount(prev => prev + 1);
     } else if (road.type === 'highway') {
       setHighwayCount(prev => prev + 1);
+    } else if (road.isOverpass) {
+      setOverpassCount(prev => prev + 1);
     }
     
     setRoads(prev => prev.filter(r => r !== road));
     setSelectedRoad(null);
-  }, [setRoads, setBridgeCount, setHighwayCount]);
+  }, [setRoads, setBridgeCount, setHighwayCount, setOverpassCount]);
 
   /** 터치 시작 (모바일) */
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -687,6 +743,20 @@ export function useRoadDrawing({
         const dx = point.x - drawStart.x;
         const dy = point.y - drawStart.y;
         const ratio = MAX_BRIDGE_LENGTH / dist;
+        point = {
+          x: drawStart.x + dx * ratio,
+          y: drawStart.y + dy * ratio,
+        };
+      }
+    }
+
+    // 고가차도 모드 길이 제한
+    if (activeTool === 'overpass') {
+      const dist = distance(drawStart, point);
+      if (dist > MAX_OVERPASS_LENGTH) {
+        const dx = point.x - drawStart.x;
+        const dy = point.y - drawStart.y;
+        const ratio = MAX_OVERPASS_LENGTH / dist;
         point = {
           x: drawStart.x + dx * ratio,
           y: drawStart.y + dy * ratio,
