@@ -138,6 +138,7 @@ const RoadGame: React.FC = () => {
     isOrthoMode,
     selectedRoad,
     setSelectedRoad,
+    previewCost,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
@@ -1100,6 +1101,18 @@ const RoadGame: React.FC = () => {
               transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
             }}
           />
+          
+          {/* 건설 비용 오버레이 */}
+          {previewCost && isDrawing && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
+              <div className="px-4 py-2 rounded-lg bg-slate-800/90 text-white font-bold text-sm shadow-lg whitespace-nowrap">
+                {previewCost.type === 'bridge' && '🌉 다리 건설: 0P'}
+                {previewCost.type === 'highway' && '🛣️ 고속도로 건설: 0P'}
+                {previewCost.type === 'overpass' && '🌁 고가차도 건설: 0P'}
+                {previewCost.type === 'normal' && `🚧 건설 비용: ${previewCost.cost}P`}
+              </div>
+            </div>
+          )}
           
           {/* 경고 메시지 */}
           <WarningMessage message={warningMessage} />

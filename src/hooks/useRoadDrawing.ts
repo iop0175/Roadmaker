@@ -64,6 +64,7 @@ export function useRoadDrawing({
   const [isCurveMode, setIsCurveMode] = useState(false);
   const [isOrthoMode, setIsOrthoMode] = useState(false);
   const [selectedRoad, setSelectedRoad] = useState<Road | null>(null);
+  const [previewCost, setPreviewCost] = useState<{ cost: number; type: 'normal' | 'bridge' | 'highway' | 'overpass' } | null>(null);
 
   // 패닝 상태
   const isPanning = useRef(false);
@@ -416,7 +417,30 @@ export function useRoadDrawing({
     } else {
       setControlPoint(null);
     }
-  }, [isDrawing, drawStart, isOrthoMode, isCurveMode, activeTool, snapToRoadEndpoint]);
+    
+    // 미리보기 비용 계산
+    const dist = distance(drawStart, point);
+    if (dist > 30) {
+      const crossesRiver = doesRoadCrossRiver(drawStart, point);
+      let costType: 'normal' | 'bridge' | 'highway' | 'overpass' = 'normal';
+      let costValue = Math.ceil(dist);
+      
+      if (activeTool === 'highway') {
+        costType = 'highway';
+        costValue = 0;
+      } else if (activeTool === 'bridge' && crossesRiver) {
+        costType = 'bridge';
+        costValue = 0;
+      } else if (activeTool === 'overpass') {
+        costType = 'overpass';
+        costValue = 0;
+      }
+      
+      setPreviewCost({ cost: costValue, type: costType });
+    } else {
+      setPreviewCost(null);
+    }
+  }, [isDrawing, drawStart, isOrthoMode, isCurveMode, activeTool, snapToRoadEndpoint, doesRoadCrossRiver]);
 
   /** 마우스 업 */
   const handleMouseUp = useCallback(() => {
@@ -633,6 +657,7 @@ export function useRoadDrawing({
     setDrawStart(null);
     setCurrentEnd(null);
     setControlPoint(null);
+    setPreviewCost(null);
   }, [
     isDrawing, drawStart, currentEnd, controlPoint, roads, buildings,
     activeTool, score, bridgeCount, highwayCount, overpassCount, language,
@@ -652,9 +677,16 @@ export function useRoadDrawing({
       setOverpassCount(prev => prev + 1);
     }
     
-    setRoads(prev => prev.filter(r => r !== road));
+    // 도로 삭제 후 교차점 갱신
+    setRoads(prev => {
+      const newRoads = prev.filter(r => r !== road);
+      // 교차점 재계산
+      const newIntersections = findIntersections(newRoads, buildings);
+      setIntersections(newIntersections);
+      return newRoads;
+    });
     setSelectedRoad(null);
-  }, [setRoads, setBridgeCount, setHighwayCount, setOverpassCount]);
+  }, [setRoads, setBridgeCount, setHighwayCount, setOverpassCount, findIntersections, buildings, setIntersections]);
 
   /** 터치 시작 (모바일) */
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -783,6 +815,7 @@ export function useRoadDrawing({
     isOrthoMode,
     selectedRoad,
     setSelectedRoad,
+    previewCost,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

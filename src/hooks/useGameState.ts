@@ -148,18 +148,33 @@ export function useGameState(): GameStateReturn {
     setIsPaused(true); // 새 게임도 빌드 모드로 시작
   }, []);
 
-  // 일시정지 해제 시 건물 타이머 리셋
+  // 일시정지 시간 추적 (타이머 정지용)
+  const pausedAtRef = useRef<number | null>(null);
   const prevPausedRef = useRef(isPaused);
+  
   useEffect(() => {
-    // isPaused가 true -> false로 바뀔 때 (게임 시작)
-    if (prevPausedRef.current === true && isPaused === false) {
-      const now = Date.now();
-      setBuildings(prev => prev.map(b => ({
-        ...b,
-        lastActiveTime: now,
-        createdAt: now, // grace period도 리셋
-      })));
+    const prevPaused = prevPausedRef.current;
+    
+    // isPaused가 false -> true로 바뀔 때 (일시정지 시작)
+    if (prevPaused === false && isPaused === true) {
+      pausedAtRef.current = Date.now();
     }
+    
+    // isPaused가 true -> false로 바뀔 때 (게임 재개)
+    if (prevPaused === true && isPaused === false) {
+      const pausedAt = pausedAtRef.current;
+      if (pausedAt) {
+        const pausedDuration = Date.now() - pausedAt;
+        // 일시정지된 시간만큼 lastActiveTime을 앞으로 밀기 (타이머 보존)
+        setBuildings(prev => prev.map(b => ({
+          ...b,
+          lastActiveTime: b.lastActiveTime + pausedDuration,
+          createdAt: b.createdAt + pausedDuration, // grace period도 보존
+        })));
+      }
+      pausedAtRef.current = null;
+    }
+    
     prevPausedRef.current = isPaused;
   }, [isPaused]);
 

@@ -158,8 +158,8 @@ export function useIntersections() {
           );
           if (intersection && !isPointOnBuilding(intersection, buildings) && !isNearBuilding(intersection, buildings)) {
             if (!result.some(r => 
-              Math.abs(r.point.x - intersection.x) < 5 && 
-              Math.abs(r.point.y - intersection.y) < 5
+              Math.abs(r.point.x - intersection.x) < 20 && 
+              Math.abs(r.point.y - intersection.y) < 20
             )) {
               result.push({ point: intersection, vehicleCount: 0 });
             }
@@ -178,8 +178,8 @@ export function useIntersections() {
           );
           if (intersection && !isPointOnBuilding(intersection, buildings) && !isNearBuilding(intersection, buildings)) {
             if (!result.some(r => 
-              Math.abs(r.point.x - intersection.x) < 8 && 
-              Math.abs(r.point.y - intersection.y) < 8
+              Math.abs(r.point.x - intersection.x) < 20 && 
+              Math.abs(r.point.y - intersection.y) < 20
             )) {
               result.push({ point: intersection, vehicleCount: 0 });
             }
@@ -188,7 +188,38 @@ export function useIntersections() {
       }
     }
     
-    return result;
+    // 3. 가까운 교차점 병합 (20px 이내 교차점은 하나로)
+    const MERGE_DISTANCE = 20;
+    const mergedResult: Intersection[] = [];
+    const used = new Set<number>();
+    
+    for (let i = 0; i < result.length; i++) {
+      if (used.has(i)) continue;
+      
+      const cluster: Intersection[] = [result[i]];
+      used.add(i);
+      
+      // 가까운 교차점들을 클러스터에 추가
+      for (let j = i + 1; j < result.length; j++) {
+        if (used.has(j)) continue;
+        if (distance(result[i].point, result[j].point) < MERGE_DISTANCE) {
+          cluster.push(result[j]);
+          used.add(j);
+        }
+      }
+      
+      // 클러스터의 중심점 계산
+      const avgX = cluster.reduce((sum, c) => sum + c.point.x, 0) / cluster.length;
+      const avgY = cluster.reduce((sum, c) => sum + c.point.y, 0) / cluster.length;
+      const totalVehicles = cluster.reduce((sum, c) => sum + c.vehicleCount, 0);
+      
+      mergedResult.push({
+        point: { x: Math.round(avgX), y: Math.round(avgY) },
+        vehicleCount: totalVehicles,
+      });
+    }
+    
+    return mergedResult;
   }, [getLineIntersection, isPointOnBuilding, isNearBuilding, isBridgeEndpoint]);
 
   return {

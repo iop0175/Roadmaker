@@ -222,17 +222,10 @@ interface RoadPreviewOptions {
 }
 
 /**
- * 두 점 사이의 거리 계산
- */
-function getDistance(p1: Point, p2: Point): number {
-  return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
-}
-
-/**
  * 도로 프리뷰 렌더링
  */
 export function renderRoadPreview(ctx: CanvasRenderingContext2D, options: RoadPreviewOptions): void {
-  const { drawStart, currentEnd, controlPoint, isInvalid, crossesRiver, hasBridge, cost, isBridgeMode, isHighwayMode } = options;
+  const { drawStart, currentEnd, controlPoint, isInvalid, crossesRiver, hasBridge, isBridgeMode, isHighwayMode } = options;
   
   let previewColor = 'rgba(66, 133, 244, 0.5)'; // 기본: 파란색
   
@@ -273,40 +266,6 @@ export function renderRoadPreview(ctx: CanvasRenderingContext2D, options: RoadPr
     ctx.arc(controlPoint.x, controlPoint.y, 6, 0, Math.PI * 2);
     ctx.fill();
   }
-
-  // 비용 표시 (도로 중간 위치)
-  const midX = controlPoint 
-    ? (drawStart.x + 2 * controlPoint.x + currentEnd.x) / 4
-    : (drawStart.x + currentEnd.x) / 2;
-  const midY = controlPoint 
-    ? (drawStart.y + 2 * controlPoint.y + currentEnd.y) / 4
-    : (drawStart.y + currentEnd.y) / 2;
-
-  const dist = getDistance(drawStart, currentEnd);
-  if (dist > 30) { // 충분히 길때만 표시
-    // 배경
-    ctx.fillStyle = isInvalid ? 'rgba(239, 68, 68, 0.9)' : 'rgba(15, 23, 42, 0.85)';
-    const textWidth = ctx.measureText(`${cost}P`).width || 40;
-    const padding = 6;
-    const bgWidth = textWidth + padding * 2 + 10;
-    const bgHeight = 22;
-    
-    ctx.beginPath();
-    ctx.roundRect(midX - bgWidth / 2, midY - bgHeight / 2 - 15, bgWidth, bgHeight, 4);
-    ctx.fill();
-
-    // 아이콘/텍스트
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px system-ui';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    if (isBridgeMode && crossesRiver) {
-      ctx.fillText('다리 0P', midX, midY - 15);
-    } else if (isHighwayMode) {
-      ctx.fillText('고속도로 0P', midX, midY - 15);
-    } else {
-      ctx.fillText(`${cost}P`, midX, midY - 15);
-    }
-  }
+  
+  // 비용 표시는 React 오버레이로 처리 (previewCost)
 }

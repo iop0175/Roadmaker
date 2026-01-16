@@ -26,9 +26,9 @@ export const MIN_BUILDING_DISTANCE = 100; // 건물 간 최소 거리
 export const MIN_HOME_OFFICE_DISTANCE = 200; // 집-회사 간 최소 거리
 
 // ============ 강 설정 ============
-export const MAX_BRIDGE_LENGTH = 180; // 다리 최대 길이 (120 -> 180으로 증가)
+export const MAX_BRIDGE_LENGTH = 250; // 다리 최대 길이 (180 -> 250으로 증가)
 export const RIVER_MIN_WIDTH = 60;  // 다리 최대 길이보다 좁게
-export const RIVER_MAX_WIDTH = 150; // 다리로 건널 수 있는 최대 폭 (100 -> 150으로 증가)
+export const RIVER_MAX_WIDTH = 200; // 다리로 건널 수 있는 최대 폭 (150 -> 200으로 증가)
 
 // ============ 고가차도 설정 ============
 export const MAX_OVERPASS_LENGTH = 200; // 고가차도 최대 길이
