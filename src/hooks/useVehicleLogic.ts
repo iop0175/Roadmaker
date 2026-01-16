@@ -232,27 +232,30 @@ export function useVehicleLogic({
             distance(vehicle.position, intersection.point) < 15
           );
           
-          // 같은 차선에서 앞에 있는 차량과의 충돌 방지
-          const aheadVehicle = vehiclesWithArrivalTimes.find(other => {
-            if (other.id === vehicle.id) return false;
-            if (other.status !== vehicle.status) return false;
+          // 교차로 안에서는 절대 멈추지 않음 - 무조건 통과
+          if (!insideIntersection) {
+            // 같은 차선에서 앞에 있는 차량과의 충돌 방지
+            const aheadVehicle = vehiclesWithArrivalTimes.find(other => {
+              if (other.id === vehicle.id) return false;
+              if (other.status !== vehicle.status) return false;
+              
+              // 같은 도로 위에 있는지 확인 (목표 지점이 비슷한지)
+              const sameRoad = other.path.length > 0 && vehicle.path.length > 0 &&
+                other.targetIndex < other.path.length && vehicle.targetIndex < vehicle.path.length &&
+                distance(other.path[other.targetIndex], target) < 10;
+              
+              if (!sameRoad) return false;
+              
+              // 앞에 있는지 확인 (목표까지의 거리가 더 가까운 차량)
+              const otherDist = distance(other.position, other.path[other.targetIndex]);
+              const myDist = distance(vehicle.position, target);
+              
+              return otherDist < myDist && distance(vehicle.position, other.position) < 25;
+            });
             
-            // 같은 도로 위에 있는지 확인 (목표 지점이 비슷한지)
-            const sameRoad = other.path.length > 0 && vehicle.path.length > 0 &&
-              other.targetIndex < other.path.length && vehicle.targetIndex < vehicle.path.length &&
-              distance(other.path[other.targetIndex], target) < 10;
-            
-            if (!sameRoad) return false;
-            
-            // 앞에 있는지 확인 (목표까지의 거리가 더 가까운 차량)
-            const otherDist = distance(other.position, other.path[other.targetIndex]);
-            const myDist = distance(vehicle.position, target);
-            
-            return otherDist < myDist && distance(vehicle.position, other.position) < 25;
-          });
-          
-          if (aheadVehicle) {
-            shouldWait = true;
+            if (aheadVehicle) {
+              shouldWait = true;
+            }
           }
           
           if (!insideIntersection && !shouldWait) {
@@ -332,6 +335,55 @@ export function useVehicleLogic({
     }, VEHICLE_SPAWN_INTERVAL / gameSpeed);
     return () => clearInterval(spawnInterval);
   }, [roads.length, vehicles.length, spawnVehicle, gameSpeed, isGameOver, isPaused]);
+
+  /** 도로 변경 시 이동 중인 차량 경로 재계산 */
+  useEffect(() => {
+    if (roads.length === 0) return;
+    
+    setVehicles(prevVehicles => {
+      return prevVehicles.map(vehicle => {
+        // 이동 중인 차량만 경로 재계산
+        if (vehicle.status !== 'going-to-office' && vehicle.status !== 'going-home') {
+          return vehicle;
+        }
+        
+        // 현재 목표 건물 찾기
+        const targetBuildingId = vehicle.status === 'going-to-office' ? vehicle.toBuilding : vehicle.fromBuilding;
+        const targetBuilding = buildings.find(b => b.id === targetBuildingId);
+        if (!targetBuilding) return vehicle;
+        
+        // 새 경로 계산
+        const newRawPath = findPath(vehicle.position, targetBuilding.position, roads);
+        if (!newRawPath || newRawPath.length < 2) return vehicle;
+        
+        const newPath = interpolatePath(newRawPath, roads);
+        if (newPath.length < 2) return vehicle;
+        
+        // 새 경로가 더 짧으면 경로 변경
+        const currentRemainingPath = vehicle.path.slice(vehicle.targetIndex);
+        const currentRemainingDist = currentRemainingPath.reduce((acc, pt, i) => {
+          if (i === 0) return acc;
+          return acc + distance(currentRemainingPath[i - 1], pt);
+        }, 0);
+        
+        const newPathDist = newPath.reduce((acc, pt, i) => {
+          if (i === 0) return acc;
+          return acc + distance(newPath[i - 1], pt);
+        }, 0);
+        
+        // 새 경로가 20% 이상 짧으면 변경
+        if (newPathDist < currentRemainingDist * 0.8) {
+          return {
+            ...vehicle,
+            path: newPath,
+            targetIndex: 1,
+          };
+        }
+        
+        return vehicle;
+      });
+    });
+  }, [roads.length, buildings, findPath, setVehicles]);
 
   return {
     spawnVehicle,

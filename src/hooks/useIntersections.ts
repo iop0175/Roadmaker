@@ -91,8 +91,11 @@ export function useIntersections() {
   const findIntersections = useCallback((roadList: Road[], buildings: Building[] = []): Intersection[] => {
     const points = new Map<string, number>();
     
+    // 고가도로는 교차점 계산에서 제외 (위로 지나가므로)
+    const normalRoads = roadList.filter(r => !r.isOverpass);
+    
     // 1. 도로 끝점 교차 (2개 이상의 도로가 같은 점에서 만남)
-    roadList.forEach(road => {
+    normalRoads.forEach(road => {
       const startKey = `${road.start.x},${road.start.y}`;
       const endKey = `${road.end.x},${road.end.y}`;
       points.set(startKey, (points.get(startKey) || 0) + 1);
@@ -107,7 +110,7 @@ export function useIntersections() {
         // 직선 구간인지 확인 (2갈래이고 각도가 180도에 가까운 경우 교차점 제외)
         if (count === 2) {
           const point = { x, y };
-          const connectedRoads = roadList.filter(r => 
+          const connectedRoads = normalRoads.filter(r => 
             distance(r.start, point) < 0.5 || 
             distance(r.end, point) < 0.5
           );
@@ -144,11 +147,11 @@ export function useIntersections() {
       }
     });
     
-    // 2. 도로 중간 교차 (두 도로가 중간에서 만남)
-    for (let i = 0; i < roadList.length; i++) {
-      for (let j = i + 1; j < roadList.length; j++) {
-        const road1 = roadList[i];
-        const road2 = roadList[j];
+    // 2. 도로 중간 교차 (두 도로가 중간에서 만남) - 고가도로 제외
+    for (let i = 0; i < normalRoads.length; i++) {
+      for (let j = i + 1; j < normalRoads.length; j++) {
+        const road1 = normalRoads[i];
+        const road2 = normalRoads[j];
         
         // 직선 도로 간 교차 감지
         if (!road1.controlPoint && !road2.controlPoint) {

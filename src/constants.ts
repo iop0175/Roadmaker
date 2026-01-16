@@ -22,16 +22,16 @@ export const SCORE_PER_TRIP = 20;
 
 // ============ 건물 배치 설정 ============
 export const BUILDING_MARGIN = 60; // 캔버스 가장자리 여백
-export const MIN_BUILDING_DISTANCE = 100; // 건물 간 최소 거리
+export const MIN_BUILDING_DISTANCE = 120; // 건물 간 최소 거리 (100 -> 120으로 증가)
 export const MIN_HOME_OFFICE_DISTANCE = 200; // 집-회사 간 최소 거리
 
 // ============ 강 설정 ============
-export const MAX_BRIDGE_LENGTH = 250; // 다리 최대 길이 (180 -> 250으로 증가)
+export const MAX_BRIDGE_LENGTH = 350; // 다리 최대 길이 (250 -> 350으로 증가)
 export const RIVER_MIN_WIDTH = 60;  // 다리 최대 길이보다 좁게
-export const RIVER_MAX_WIDTH = 200; // 다리로 건널 수 있는 최대 폭 (150 -> 200으로 증가)
+export const RIVER_MAX_WIDTH = 300; // 다리로 건널 수 있는 최대 폭 (200 -> 300으로 증가)
 
 // ============ 고가차도 설정 ============
-export const MAX_OVERPASS_LENGTH = 200; // 고가차도 최대 길이
+export const MAX_OVERPASS_LENGTH = 400; // 고가차도 최대 길이 (200 -> 400으로 증가)
 
 // ============ 도로 설정 ============
 export const ROAD_WIDTH = 18;

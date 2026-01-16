@@ -40,14 +40,5 @@ export function renderVehicles(ctx: CanvasRenderingContext2D, vehicles: Vehicle[
     ctx.strokeStyle = shadeColor(vehicle.color, -30);
     ctx.lineWidth = 1.5;
     ctx.stroke();
-
-    // 퇴근 중 표시
-    if (vehicle.status === 'going-home') {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 8px system-ui';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('⌂', vehicle.position.x, vehicle.position.y);
-    }
   });
 }
