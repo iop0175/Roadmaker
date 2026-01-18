@@ -340,16 +340,16 @@ export function generateHome(
     attempts++;
   }
 
-  // 실패 시 강제로 겹치지 않는 위치 찾기 (격자 탐색)
+  // 실패 시 강제로 겹치지 않는 위치 찾기 (격자 탐색 - 더 촘촘하게)
   if (!homePos) {
-     // 최후의 수단: 맵 전체 그리드 스캔
-     for(let x=BUILDING_MARGIN; x<width-BUILDING_MARGIN; x+=50) {
-        for(let y=BUILDING_MARGIN; y<height-BUILDING_MARGIN; y+=50) {
+     // 최후의 수단: 맵 전체 그리드 스캔 (30픽셀 간격)
+     for(let x=BUILDING_MARGIN; x<width-BUILDING_MARGIN; x+=30) {
+        for(let y=BUILDING_MARGIN; y<height-BUILDING_MARGIN; y+=30) {
             const point = {x, y};
             const isOverlapping = existingBuildings.some(b => distance(b.position, point) < MIN_BUILDING_DISTANCE);
              if (!isPointInRiverStatic(point, riverSegments) && 
                  !isOverlapping && 
-                 !isTooCloseToRoads(point, roads, 50)) {
+                 !isTooCloseToRoads(point, roads, 40)) {
                 homePos = point;
                 break;
              }
@@ -358,9 +358,9 @@ export function generateHome(
      }
   }
 
-  // 그래도 없으면... 어쩔 수 없음 (드문 경우)
+  // 그래도 없으면 null 반환 (공간 부족으로 건물 생성 불가)
   if (!homePos) {
-      homePos = { x: width/2, y: height/2 }; 
+      return null as unknown as Building; // 호출하는 쪽에서 null 체크 필요
   }
   
   const suffix = Date.now() + Math.floor(Math.random() * 1000);
@@ -408,15 +408,19 @@ export function generateOffice(
     attempts++;
   }
 
-  // 실패 시 격자 탐색
+  // 실패 시 격자 탐색 (더 촘촘하게)
   if (!officePos) {
-     for(let x=BUILDING_MARGIN; x<width-BUILDING_MARGIN; x+=50) {
-        for(let y=BUILDING_MARGIN; y<height-BUILDING_MARGIN; y+=50) {
+     for(let x=BUILDING_MARGIN; x<width-BUILDING_MARGIN; x+=30) {
+        for(let y=BUILDING_MARGIN; y<height-BUILDING_MARGIN; y+=30) {
             const point = {x, y};
             const isOverlapping = existingBuildings.some(b => distance(b.position, point) < MIN_BUILDING_DISTANCE);
+            const tooCloseToAnyHome = existingBuildings
+              .filter(b => b.id.includes('home'))
+              .some(h => distance(h.position, point) < MIN_HOME_OFFICE_DISTANCE);
             if (!isPointInRiverStatic(point, riverSegments) && 
                 !isOverlapping && 
-                !isTooCloseToRoads(point, roads, 55)) {
+                !tooCloseToAnyHome &&
+                !isTooCloseToRoads(point, roads, 45)) {
                 officePos = point;
                 break;
             }
@@ -425,8 +429,9 @@ export function generateOffice(
      }
   }
 
+  // 그래도 없으면 null 반환 (공간 부족으로 건물 생성 불가)
   if (!officePos) {
-    officePos = { x: width - BUILDING_MARGIN - Math.random() * 100, y: height - BUILDING_MARGIN - Math.random() * 100 };
+    return null as unknown as Building; // 호출하는 쪽에서 null 체크 필요
   }
 
   const suffix = Date.now() + Math.floor(Math.random() * 1000);
@@ -451,7 +456,21 @@ export function generateBuildingPair(
   roads: Road[] = []
 ): Building[] {
   const home = generateHome(index, existingBuildings, riverSegments, width, height, roads);
+  
+  // home이 null이면 빈 배열 반환 (공간 부족)
+  if (!home) {
+    return [];
+  }
+  
   const office = generateOffice(index, [...existingBuildings, home], riverSegments, width, height, roads);
+  
+  // office가 null이면 home만 반환
+  if (!office) {
+    if (index < 5) {
+      home.id = `color${index}-home`;
+    }
+    return [home];
+  }
   
   if (index < 5) {
       home.id = `color${index}-home`;

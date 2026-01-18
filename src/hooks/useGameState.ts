@@ -268,6 +268,13 @@ export function useGameState(): GameStateReturn {
       }
       return total;
     };
+
+    // 맵 확장 함수 (100px씩 확장)
+    const expandMapIfNeeded = () => {
+      const newWidth = mapSize.width + 100;
+      const newHeight = mapSize.height + 75; // 4:3 비율 유지
+      setMapSize({ width: newWidth, height: newHeight });
+    };
     
     if (basePairsCount < 5) {
       if (basePairsCount > 0) {
@@ -281,7 +288,14 @@ export function useGameState(): GameStateReturn {
             mapSize.height,
             roads
           );
-          setBuildings(prev => [...prev, ...newPair]);
+          // null 체크: 공간이 부족하면 맵 확장
+          const validBuildings = newPair.filter(b => b !== null);
+          if (validBuildings.length > 0) {
+            setBuildings(prev => [...prev, ...validBuildings]);
+          } else {
+            // 공간 부족 - 맵 확장 후 다음 프레임에서 재시도
+            expandMapIfNeeded();
+          }
         }
       }
     } else {
@@ -305,7 +319,12 @@ export function useGameState(): GameStateReturn {
           mapSize.height,
           roads
         );
-        setBuildings(prev => [...prev, newHome]);
+        // null 체크: 공간이 부족하면 맵 확장
+        if (newHome) {
+          setBuildings(prev => [...prev, newHome]);
+        } else {
+          expandMapIfNeeded();
+        }
       }
       
       // 회사도 마찬가지로 간격 감소
@@ -330,7 +349,12 @@ export function useGameState(): GameStateReturn {
             mapSize.height,
             roads
           );
-          setBuildings(prev => [...prev, newOffice]);
+          // null 체크: 공간이 부족하면 맵 확장
+          if (newOffice) {
+            setBuildings(prev => [...prev, newOffice]);
+          } else {
+            expandMapIfNeeded();
+          }
         }
       }
     }

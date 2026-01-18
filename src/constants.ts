@@ -24,8 +24,8 @@ export const SCORE_PER_TRIP = 20;
 
 // ============ 건물 배치 설정 ============
 export const BUILDING_MARGIN = 60; // 캔버스 가장자리 여백
-export const MIN_BUILDING_DISTANCE = 120; // 건물 간 최소 거리 (100 -> 120으로 증가)
-export const MIN_HOME_OFFICE_DISTANCE = 200; // 집-회사 간 최소 거리
+export const MIN_BUILDING_DISTANCE = 100; // 건물 간 최소 거리
+export const MIN_HOME_OFFICE_DISTANCE = 180; // 집-회사 간 최소 거리
 
 // ============ 강 설정 ============
 export const MAX_BRIDGE_LENGTH = 350; // 다리 최대 길이 (250 -> 350으로 증가)
